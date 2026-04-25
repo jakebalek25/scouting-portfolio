@@ -1,4 +1,4 @@
-const CACHE_NAME = 'jake-scouting-v48;
+const CACHE_NAME = 'jake-scouting-v49;
 
 // All the assets needed to run the app offline
 const ASSETS = [
