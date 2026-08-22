@@ -3611,17 +3611,9 @@ function voApplyLock(root) {
 function initViewOnlyMode() {
   document.body.classList.add('view-only-mode');
 
-  // Fixed tab set for the public site — Pro, Rankings, Grade Scale, Scorecard, Projects.
-  // Amateur, To-Do, and Add Player are never shown here.
-  const allowedTabs = DEFAULT_VIEW_ONLY_VISIBLE.slice();
-
-  ALL_VIEW_ONLY_TAB_IDS.forEach(id => {
-    const suffix = id.replace('tab-', '');
-    if (!allowedTabs.includes(suffix)) {
-      const el = document.getElementById(id);
-      if (el) el.style.display = 'none';
-    }
-  });
+  // Tab visibility is applied later, once state.publicHiddenTabs loads from
+  // Supabase (see applyPublicTabVisibility) — Jake controls this live from the
+  // private site, no redeploy needed. Everything stays visible until then.
 
   const banner = document.createElement('div');
   banner.className = 'vo-banner';
@@ -3638,17 +3630,31 @@ function initViewOnlyMode() {
     });
   });
   observer.observe(document.body, { childList: true, subtree: true });
+}
 
-  // If the tab that's active by default (Pro) ever got excluded, land the viewer
-  // on the first allowed tab instead of a blank page. Not expected to trigger here
-  // since Pro is always in allowedTabs, but kept for safety.
-  setTimeout(() => {
-    const activeBtn = document.querySelector('.app-tab.active');
-    const activeSuffix = activeBtn && activeBtn.id ? activeBtn.id.replace('tab-', '') : null;
-    if (allowedTabs.length && (!activeSuffix || !allowedTabs.includes(activeSuffix))) {
-      switchTab(allowedTabs[0]);
-    }
-  }, 0);
+// Called once state has loaded from Supabase — reads state.publicHiddenTabs
+// (an array of tab suffixes Jake has toggled off) and hides those specific tabs.
+// Missing/empty array = everything visible, matching the "opt-out" model: tabs
+// are shown by default, Jake unchecks the ones he doesn't want public right now.
+function applyPublicTabVisibility() {
+  const hidden = Array.isArray(state.publicHiddenTabs) ? state.publicHiddenTabs : [];
+  ALL_VIEW_ONLY_TAB_IDS.forEach(id => {
+    const suffix = id.replace('tab-', '');
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.style.display = hidden.includes(suffix) ? 'none' : '';
+  });
+
+  // If the tab currently showing just got hidden, land on the first visible one
+  // instead of showing a blank page.
+  const visibleSuffixes = ALL_VIEW_ONLY_TAB_IDS
+    .map(id => id.replace('tab-', ''))
+    .filter(suffix => !hidden.includes(suffix));
+  const activeBtn = document.querySelector('.app-tab.active');
+  const activeSuffix = activeBtn && activeBtn.id ? activeBtn.id.replace('tab-', '') : null;
+  if (visibleSuffixes.length && (!activeSuffix || hidden.includes(activeSuffix))) {
+    switchTab(visibleSuffixes.includes('reports') ? 'reports' : visibleSuffixes[0]);
+  }
 }
 
 function voGetLastChoice() {
@@ -7993,43 +7999,22 @@ document.addEventListener('DOMContentLoaded', function() {
       renderAmateurReports();
       renderChecklist();
     }
-    // Now that state.draft_game is populated from cloud, check for a draft to restore
-    const cloudDraft = (state.draft_game && !isDraftStale(state.draft_game)) ? state.draft_game : null;
-    if (!cloudDraft && state.draft_game) delete state.draft_game; // purge stale draft, e.g. already-published
-    if (cloudDraft && !cloudDraft.finished && !activeGame) {
-      activeGame = cloudDraft;
-      try { localStorage.setItem(DRAFT_KEY, JSON.stringify(cloudDraft)); } catch(e) {}
-      startAutoSave();
-      switchTab('scorecard');
-      showActiveGame();
-      renderBatters('away');
-      renderBatters('home');
-      setTimeout(function() {
-        const teams = esc(cloudDraft.away || '?') + ' @ ' + esc(cloudDraft.home || '?');
-        let toast = document.getElementById('draftRestoredToast');
-        if (!toast) {
-          toast = document.createElement('div');
-          toast.id = 'draftRestoredToast';
-          toast.style.cssText = [
-            'position:fixed','bottom:18px','left:18px',
-            'background:rgba(91,164,207,0.15)',
-            'border:1px solid rgba(91,164,207,0.35)',
-            'border-radius:6px','padding:10px 16px',
-            'font-family:IBM Plex Mono,monospace','font-size:10px',
-            'letter-spacing:1px','color:var(--accent)',
-            'z-index:9999','transition:opacity 0.6s','opacity:0'
-          ].join(';');
-          document.body.appendChild(toast);
-        }
-        toast.innerHTML = '\u2601 DRAFT LOADED FROM CLOUD \u00a0<span style="opacity:0.6">' + teams + '</span>';
-        toast.style.opacity = '1';
-        setTimeout(function() { toast.style.opacity = '0'; }, 3500);
-      }, 200);
-    }
+    // Public build never auto-resumes a draft game, even one that only became known
+    // after the cloud fetch completed — it always stays on Pro. Same reasoning as
+    // the synchronous check earlier: this reads the same shared Supabase data as
+    // the private editing site, and an in-progress game there shouldn't redirect a
+    // random visitor here into that live scorecard.
+    if (state.draft_game) delete state.draft_game;
     renderPastGames();
+
+    // Now that state is loaded, apply the live tab-visibility config from the
+    // private site (state.publicHiddenTabs) — this is what lets Jake toggle tabs
+    // on/off for the public site without redeploying anything.
+    applyPublicTabVisibility();
   }).catch(function() {
     showSyncStatus('⚠ Offline — using local data', true);
     renderPastGames();
+    applyPublicTabVisibility();
   });
 });
 
