@@ -1111,11 +1111,12 @@ input.vo-locked,textarea.vo-locked{cursor:default;}
 .grade-chip{display:flex;flex-direction:column;align-items:center;gap:2px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 14px;min-width:56px;}
 .grade-chip-label{font-family:'IBM Plex Mono',monospace;font-size:7px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);}
 .grade-chip-val{font-family:'Bebas Neue',sans-serif;font-size:28px;line-height:1;}
-.grade-chip-val.grade-plus{color:#47c88a;}
+.grade-chip-val.grade-plus{color:#2f9e68;}
 .grade-chip-val.grade-above{color:#8fde6a;}
 .grade-chip-val.grade-avg{color:var(--text2);}
-.grade-chip-val.grade-below{color:#e8a847;}
-.grade-chip-val.grade-minus{color:#e84747;}
+.grade-chip-val.grade-below{color:#d4816a;}
+.grade-chip-val.grade-minus{color:#c85a45;}
+.grade-chip-val.grade-verylow{color:#c73e3e;}
 
 /* Report grade table — PDF-matching in-app view */
 .report-grade-table-wrap{margin:0 0 16px;overflow-x:auto;}
@@ -1131,11 +1132,12 @@ input.vo-locked,textarea.vo-locked{cursor:default;}
 .gr-overall .gr-metric{font-weight:700;color:var(--ink);}
 .gr-val{font-family:'Bebas Neue',sans-serif;font-size:16px;text-align:center;letter-spacing:1px;}
 .gr-val.gr-empty{color:var(--text4);font-size:12px;}
-.gr-val.grade-plus{color:#47c88a;}
+.gr-val.grade-plus{color:#2f9e68;}
 .gr-val.grade-above{color:#8fde6a;}
 .gr-val.grade-avg{color:var(--text2);}
-.gr-val.grade-below{color:#e8a847;}
-.gr-val.grade-minus{color:#e84747;}
+.gr-val.grade-below{color:#d4816a;}
+.gr-val.grade-minus{color:#c85a45;}
+.gr-val.grade-verylow{color:#c73e3e;}
 .gr-note-row td{padding:5px 0 8px;border-bottom:2px solid var(--border);}
 .gr-note{font-family:'Barlow',sans-serif;font-size:10.5px;color:var(--text2);line-height:1.5;font-style:italic;}
 .gr-ofp-row td{background:rgba(91,164,207,.06);border-top:2px solid var(--accent);padding:5px 0;}
@@ -1684,10 +1686,12 @@ input.vo-locked,textarea.vo-locked{cursor:default;}
 .rank-ftp {
   font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:1px;text-align:center;
 }
-.rank-ftp.ftp-elite  { color:#47c88a; }
-.rank-ftp.ftp-plus   { color:#8fde6a; }
-.rank-ftp.ftp-avg    { color:var(--dim); }
-.rank-ftp.ftp-below  { color:#e84747; }
+.rank-ftp.grade-plus  { color:#2f9e68; }
+.rank-ftp.grade-above { color:#8fde6a; }
+.rank-ftp.grade-avg   { color:var(--dim); }
+.rank-ftp.grade-below { color:#d4816a; }
+.rank-ftp.grade-minus { color:#c85a45; }
+.rank-ftp.grade-verylow { color:#c73e3e; }
 .rank-ftp.ftp-none   { color:var(--text4);font-size:16px; }
 
 .rank-int-dot {
@@ -5389,13 +5393,29 @@ function sortPitchesArray(pitches) {
   return (pitches || []).slice().sort((a, b) => pitchArsenalSortIndex(a.name) - pitchArsenalSortIndex(b.name));
 }
 
+// Canonical tool-grade coloring — single source of truth for the red-to-green
+// intensity scale used everywhere a numeric 20-80 grade needs a color:
+//   <=30 very red, 35 mid-red, 40 light red, 45/50 uncolored, 55 light green, >=60 very green
+function gradeColorHex(v) {
+  const n = parseInt(v) || 0;
+  if (!n) return 'var(--text4)';
+  if (n <= 30) return '#c73e3e';
+  if (n <= 35) return '#c85a45';
+  if (n <= 40) return '#d4816a';
+  if (n <= 50) return 'var(--text2)';
+  if (n <= 55) return '#8fde6a';
+  return '#2f9e68';
+}
+
 function gradeClass(val) {
   const n = +val;
-  if (n >= 70) return 'grade-plus';
-  if (n >= 60) return 'grade-above';
-  if (n >= 45) return 'grade-avg';
-  if (n >= 35) return 'grade-below';
-  return 'grade-minus';
+  if (!n) return 'ftp-none';
+  if (n <= 30) return 'grade-verylow';
+  if (n <= 35) return 'grade-minus';
+  if (n <= 40) return 'grade-below';
+  if (n <= 50) return 'grade-avg';
+  if (n <= 55) return 'grade-above';
+  return 'grade-plus';
 }
 
 function renderGradeTable(grades, playerType, text, customPitches) {
@@ -5813,30 +5833,16 @@ function renderDetail() {
       </div>`;
     }).join('');
 
-  // Avg OFP — reports take priority; only fall back to follows if no report has an OFP grade
-  const _ofpVals = [];
-  (p.reports || []).forEach(r => {
-    if (r.isDraft) return;
-    const k = r.playerType === 'pitcher' ? 'g_p_ofp' : 'g_ofp';
-    const v = r.grades && r.grades[k] ? parseInt(r.grades[k]) : 0;
-    if (v) _ofpVals.push(v);
-  });
-  if (_ofpVals.length === 0) {
-    (p.follows || []).forEach(f => {
-      const v = f.futureGrade ? parseInt(f.futureGrade) : 0;
-      if (v) _ofpVals.push(v);
-    });
-  }
-  const _rawAvg = _ofpVals.length ? _ofpVals.reduce((a, b) => a + b, 0) / _ofpVals.length : null;
-  const _avgOFP = _rawAvg !== null ? Math.round(_rawAvg / 5) * 5 : null;
+  // Overall grade — most recent grade across reports and follows, no averaging
+  const _avgOFP = getPlayerFTP(p) || null;
   const _avgOFPColor = _avgOFP
-    ? (_avgOFP >= 70 ? '#47c88a' : _avgOFP >= 60 ? '#8fde6a' : _avgOFP >= 50 ? 'var(--text2)' : _avgOFP >= 45 ? 'var(--text3)' : _avgOFP >= 35 ? '#e8a847' : '#e84747')
+    ? gradeColorHex(_avgOFP)
     : 'var(--text4)';
   const _avgOFPHtml = _avgOFP
     ? '<div style="display:inline-flex;align-items:center;gap:10px;margin-bottom:20px;">'
       + '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;width:60px;height:60px;border-radius:6px;border:2px solid var(--accent);background:rgba(91,164,207,.07);">'
       + '<span style="font-family:Bebas Neue,sans-serif;font-size:32px;letter-spacing:2px;line-height:1;color:' + _avgOFPColor + ';">' + _avgOFP + '</span>'
-      + '<span style="font-family:IBM Plex Mono,monospace;font-size:7px;letter-spacing:2px;text-transform:uppercase;color:var(--text3);margin-top:2px;">AVG OFP</span>'
+      + '<span style="font-family:IBM Plex Mono,monospace;font-size:7px;letter-spacing:2px;text-transform:uppercase;color:var(--text3);margin-top:2px;">MOST RECENT · ' + esc(getGradeSource(p)).toUpperCase() + '</span>'
       + '</div>'
       + '</div>'
     : '';
@@ -6002,7 +6008,7 @@ function buildPlayerCard(p) {
     });
   }
   const avgOFP = ofpValues.length ? Math.round(ofpValues.reduce((a,b) => a+b, 0) / ofpValues.length) : null;
-  const avgOFPColor = avgOFP ? (avgOFP >= 70 ? '#47c88a' : avgOFP >= 60 ? '#8fde6a' : avgOFP >= 45 ? 'var(--text2)' : avgOFP >= 35 ? '#e8a847' : '#e84747') : '';
+  const avgOFPColor = avgOFP ? gradeColorHex(avgOFP) : '';
   const rightBadge = avgOFP
     ? '<div style="display:flex;flex-direction:column;align-items:center;gap:1px;"><span style="font-family:\'Bebas Neue\',sans-serif;font-size:28px;letter-spacing:1px;line-height:1;color:' + avgOFPColor + ';">' + avgOFP + '</span><span style="font-family:\'IBM Plex Mono\',monospace;font-size:8px;letter-spacing:1.5px;color:var(--text3);">OFP</span></div>'
     : '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:9px;color:var(--text4);">NEW</div>';
@@ -6060,13 +6066,7 @@ function _buildOrgGradeBoxes(p, ofp, ofpColor) {
   const grades = rep ? (rep.grades || {}) : {};
 
   function gradeColor(v) {
-    const n = parseInt(v) || 0;
-    if (n >= 70) return '#47c88a';
-    if (n >= 60) return '#8fde6a';
-    if (n >= 50) return 'var(--text2)';
-    if (n >= 45) return 'var(--text3)';
-    if (n >= 35) return '#e8a847';
-    return n ? '#e84747' : 'var(--text4)';
+    return gradeColorHex(v);
   }
 
   function box(val, label, isOfp) {
@@ -6188,18 +6188,12 @@ function renderReports() {
 
   // Sort players within each org
   const sortPlayers = (players) => {
-    const _getAvgOFP = p => {
-      const vals = [];
-      (p.reports||[]).forEach(r => { if(r.isDraft) return; const k = r.playerType==='pitcher'?'g_p_ofp':'g_ofp'; const v = r.grades&&r.grades[k]?parseInt(r.grades[k]):0; if(v) vals.push(v); });
-      if (vals.length === 0) { (p.follows||[]).forEach(f => { const v = f.futureGrade?parseInt(f.futureGrade):0; if(v) vals.push(v); }); }
-      return vals.length ? Math.round(vals.reduce((a,b)=>a+b,0)/vals.length/5)*5 : 0;
-    };
     return [...players].sort((a, b) => {
       if (sortBy === 'player_az') return a.name.localeCompare(b.name);
       if (sortBy === 'player_za') return b.name.localeCompare(a.name);
-      if (sortBy === 'ofp_desc')  return _getAvgOFP(b) - _getAvgOFP(a);
+      if (sortBy === 'ofp_desc')  return getPlayerFTP(b) - getPlayerFTP(a);
       // default: OFP desc
-      return _getAvgOFP(b) - _getAvgOFP(a);
+      return getPlayerFTP(b) - getPlayerFTP(a);
     });
   };
 
@@ -6216,13 +6210,6 @@ function renderReports() {
   // Auto-open any org with players if there's only one org that has players
   const orgsWithPlayers = orgsToShow.filter(o => (byOrg[o] || []).length > 0);
   if (orgsWithPlayers.length === 1) _openOrgs.add(orgsWithPlayers[0]);
-
-  const _getAvgOFP = p => {
-    const vals = [];
-    (p.reports||[]).forEach(r => { if(r.isDraft) return; const k = r.playerType==='pitcher'?'g_p_ofp':'g_ofp'; const v = r.grades&&r.grades[k]?parseInt(r.grades[k]):0; if(v) vals.push(v); });
-    if (vals.length === 0) { (p.follows||[]).forEach(f => { const v = f.futureGrade?parseInt(f.futureGrade):0; if(v) vals.push(v); }); }
-    return vals.length ? Math.round(vals.reduce((a,b)=>a+b,0)/vals.length/5)*5 : 0;
-  };
 
   let html = '';
 
@@ -6253,8 +6240,8 @@ function renderReports() {
     if (isOpen && count > 0) {
       html += `<div class="org-players-panel">`;
       players.forEach(p => {
-        const ofp = _getAvgOFP(p);
-        const ofpColor = ofp >= 70 ? '#47c88a' : ofp >= 60 ? '#8fde6a' : ofp >= 45 ? 'var(--text2)' : ofp >= 35 ? '#e8a847' : '#e84747';
+        const ofp = getPlayerFTP(p);
+        const ofpColor = gradeColorHex(ofp);
         const il = getEffectiveInterest(p);
         const intColor = il === 'high' ? '#47c88a' : il === 'low' ? '#d94f3d' : '#e6b432';
         const isProspect = (p.reports||[]).some(r => r.writtenAsProspect);
@@ -6712,10 +6699,13 @@ const GRADE_SCALE_DEFAULTS = {
   },
 };
 function gsColorFor(grade) {
-  if (grade >= 70) return { bg: 'rgba(71,200,138,.12)', border: 'rgba(71,200,138,.35)', text: '#47c88a' };
-  if (grade >= 55) return { bg: 'rgba(91,164,207,.12)', border: 'rgba(91,164,207,.35)', text: '#5ba4cf' };
-  if (grade >= 45) return { bg: 'rgba(230,180,50,.12)', border: 'rgba(230,180,50,.35)', text: '#e6b432' };
-  return { bg: 'rgba(232,71,71,.12)', border: 'rgba(232,71,71,.35)', text: '#e84747' };
+  const n = parseInt(grade) || 0;
+  if (n <= 30) return { bg: 'rgba(199,62,62,.12)', border: 'rgba(199,62,62,.35)', text: '#c73e3e' };
+  if (n <= 35) return { bg: 'rgba(200,90,69,.12)', border: 'rgba(200,90,69,.35)', text: '#c85a45' };
+  if (n <= 40) return { bg: 'rgba(212,129,106,.12)', border: 'rgba(212,129,106,.35)', text: '#d4816a' };
+  if (n <= 50) return { bg: 'var(--surface2)', border: 'var(--border)', text: 'var(--text2)' };
+  if (n <= 55) return { bg: 'rgba(143,222,106,.12)', border: 'rgba(143,222,106,.35)', text: '#8fde6a' };
+  return { bg: 'rgba(47,158,104,.12)', border: 'rgba(47,158,104,.35)', text: '#2f9e68' };
 }
 
 let gradeScale = { hitter: {}, pitcher: {} };
@@ -7354,38 +7344,32 @@ function getEffectiveInterest(p) {
 
 // Overall grade = average of all report grades if any reports exist,
 // otherwise average of all follow grades. Reports and follows are never blended.
-function getPlayerFTP(p) {
-  const reportVals = [];
+function _mostRecentGrade(p) {
+  const candidates = [];
   (p.reports || []).forEach(r => {
+    if (r.isDraft) return;
     const id = r.playerType === 'pitcher' ? 'g_p_ofp' : 'g_ofp';
     const v = r.grades && r.grades[id] ? parseInt(r.grades[id]) : 0;
-    if (v) reportVals.push(v);
+    if (v) candidates.push({ date: r.date || r.updatedAt || '', value: v, source: 'Report' });
   });
-  if (reportVals.length) {
-    const avg = reportVals.reduce((a, b) => a + b, 0) / reportVals.length;
-    return Math.round(avg / 5) * 5;
-  }
-
-  const followVals = [];
   (p.follows || []).forEach(f => {
     const v = f.futureGrade ? parseInt(f.futureGrade) : 0;
-    if (v) followVals.push(v);
+    if (v) candidates.push({ date: f.date || f.updatedAt || '', value: v, source: 'Follow' });
   });
-  if (!followVals.length) return 0;
-  const avg = followVals.reduce((a, b) => a + b, 0) / followVals.length;
-  return Math.round(avg / 5) * 5;
+  if (!candidates.length) return null;
+  candidates.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  return candidates[0];
+}
+
+function getPlayerFTP(p) {
+  const grade = _mostRecentGrade(p);
+  return grade ? grade.value : 0;
 }
 
 // Returns where the displayed grade comes from
 function getGradeSource(p) {
-  const hasReportGrade = (p.reports || []).some(r => {
-    const id = r.playerType === 'pitcher' ? 'g_p_ofp' : 'g_ofp';
-    return r.grades && r.grades[id] && parseInt(r.grades[id]) > 0;
-  });
-  if (hasReportGrade) return 'Report';
-  const hasFollowGrade = (p.follows || []).some(f => f.futureGrade && parseInt(f.futureGrade) > 0);
-  if (hasFollowGrade) return 'Follow';
-  return '—';
+  const grade = _mostRecentGrade(p);
+  return grade ? grade.source : '—';
 }
 
 // Has at least one prospect report
@@ -7615,14 +7599,6 @@ function _renderRankingsInner(feed) {
     return;
   }
 
-  function ftpClass(ftp) {
-    if (!ftp) return 'ftp-none';
-    if (ftp >= 70) return 'ftp-elite';
-    if (ftp >= 60) return 'ftp-plus';
-    if (ftp >= 45) return 'ftp-avg';
-    return 'ftp-below';
-  }
-
   function buildRow(p, rank) {
     const ftp = getPlayerFTP(p);
     const il = getEffectiveInterest(p);
@@ -7645,7 +7621,7 @@ function _renderRankingsInner(feed) {
     const colspan = isDragMode ? 7 : 6;
     const gradeSource = getGradeSource(p);
     const gradeSourceColor = gradeSource === 'Report' ? '#47c88a' : gradeSource === 'Follow' ? '#5ba4cf' : 'var(--text4)';
-    const ofpColor = ftp >= 70 ? '#47c88a' : ftp >= 60 ? '#8fde6a' : ftp >= 45 ? 'var(--text2)' : ftp >= 35 ? '#e8a847' : '#e84747';
+    const ofpColor = gradeColorHex(ftp);
 
     return `<tr class="rank-row rank-row-${il}" data-pid="${p.id}" draggable="${isDragMode}" onclick="goToRankPlayer('${p.id}')">
       ${dragHandle}
@@ -7660,7 +7636,7 @@ function _renderRankingsInner(feed) {
         </div>
       </td>
       <td><span class="rank-pos-badge">${esc(p.position) || '—'}</span></td>
-      <td class="rank-ftp ${ftpClass(ftp)}">${ftp || '—'}</td>
+      <td class="rank-ftp ${gradeClass(ftp)}">${ftp || '—'}</td>
       <td style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.5px;color:${gradeSourceColor};">${gradeSource}</td>
       <td>
         <div style="display:flex;align-items:center;gap:7px;">
@@ -7863,7 +7839,7 @@ function buildAmateurBoard(players) {
       : '';
 
     const ofpBadge = ofpVal
-      ? '<span style="font-family:\'Bebas Neue\',sans-serif;font-size:20px;letter-spacing:1px;' + (() => { const n=+ofpVal; return n>=70?'color:#47c88a':n>=60?'color:#8fde6a':n>=45?'color:var(--dim)':'color:var(--red)'; })() + ';">' + ofpVal + '</span>'
+      ? '<span style="font-family:\'Bebas Neue\',sans-serif;font-size:20px;letter-spacing:1px;' + (() => { const n=+ofpVal; return 'color:' + gradeColorHex(n); })() + ';">' + ofpVal + '</span>'
       : '';
 
     const _impact = getReportOrFollowImpact(p);
@@ -10207,11 +10183,13 @@ function exportReportPDF(playerId, reportId) {
 
   function gradeColor(v) {
     const n = +v;
-    if (n >= 70) return '#2e8b57';
-    if (n >= 60) return '#5a8a2a';
-    if (n >= 45) return '#555';
-    if (n >= 35) return '#b07000';
-    return '#c0392b';
+    if (!n) return '#999';
+    if (n <= 30) return '#a52d21';
+    if (n <= 35) return '#b8543d';
+    if (n <= 40) return '#c47a64';
+    if (n <= 50) return '#555';
+    if (n <= 55) return '#7ba045';
+    return '#227044';
   }
 
   // Parse report text sections into a map keyed by section name
