@@ -2197,9 +2197,9 @@ tr.rank-row.rk-drag-below td { box-shadow:inset 0 -2px 0 var(--accent); }
     <div class="rankings-filter-sep"></div>
     <span class="rankings-controls-label">Filter</span>
     <select id="rk_filter_interest" data-vosafe="true" onchange="renderRankings()" style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1px;background:var(--card);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:5px 10px;outline:none;cursor:pointer;">
-      <option value="">All Interest</option>
+      <option value="">All Grade Levels</option>
       <option value="high">High Only</option>
-      <option value="standard">Standard Only</option>
+      <option value="standard">Medium Only</option>
       <option value="low">Low Only</option>
     </select>
     <select id="rk_filter_pos" data-vosafe="true" onchange="renderRankings()" style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1px;background:var(--card);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:5px 10px;outline:none;cursor:pointer;">
@@ -2222,15 +2222,15 @@ tr.rank-row.rk-drag-below td { box-shadow:inset 0 -2px 0 var(--accent); }
     <div style="display:flex;gap:20px;margin-bottom:18px;flex-wrap:wrap;">
     <div style="display:flex;align-items:center;gap:6px;">
       <div style="width:8px;height:8px;border-radius:50%;background:#47c88a;"></div>
-      <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--text3);">High Interest</span>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--text3);">High</span>
     </div>
     <div style="display:flex;align-items:center;gap:6px;">
       <div style="width:8px;height:8px;border-radius:50%;background:#e6b432;"></div>
-      <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--text3);">Standard</span>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--text3);">Medium</span>
     </div>
     <div style="display:flex;align-items:center;gap:6px;">
       <div style="width:8px;height:8px;border-radius:50%;background:#d94f3d;"></div>
-      <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--text3);">Low Interest</span>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--text3);">Low</span>
     </div>
     <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
       <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--text3);">In Custom Order mode — grab ⠿ to drag rows into position. Order saves automatically.</span>
@@ -2248,6 +2248,20 @@ tr.rank-row.rk-drag-below td { box-shadow:inset 0 -2px 0 var(--accent); }
 <div class="about-page">
   <div class="articles-section-hed" style="font-size:48px;letter-spacing:4px;display:flex;align-items:baseline;gap:14px;">Grade Scale <span class="gs-saved-label" id="gsSavedLabel">Saved</span></div>
   <div class="articles-section-sub" style="margin-bottom:20px;">The 20-80 scale, in your own words — what each grade actually means when you write it</div>
+  <div style="display:flex;gap:16px;flex-wrap:wrap;padding:14px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;margin-bottom:20px;">
+    <div style="display:flex;align-items:baseline;gap:8px;flex:1;min-width:220px;">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#47c88a;font-weight:700;flex-shrink:0;">High</span>
+      <span style="font-family:'Barlow',sans-serif;font-size:12px;color:var(--text2);line-height:1.5;">Trending toward the next grade up</span>
+    </div>
+    <div style="display:flex;align-items:baseline;gap:8px;flex:1;min-width:220px;">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#e6b432;font-weight:700;flex-shrink:0;">Medium</span>
+      <span style="font-family:'Barlow',sans-serif;font-size:12px;color:var(--text2);line-height:1.5;">Safely ranked at that grade</span>
+    </div>
+    <div style="display:flex;align-items:baseline;gap:8px;flex:1;min-width:220px;">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#d94f3d;font-weight:700;flex-shrink:0;">Low</span>
+      <span style="font-family:'Barlow',sans-serif;font-size:12px;color:var(--text2);line-height:1.5;">Trending toward the grade below</span>
+    </div>
+  </div>
   <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:20px;">
     <div class="toggle-group" style="margin-bottom:0;width:220px;">
       <button type="button" class="toggle-btn gs-type-btn active" id="gsTypeBtn_hitter" data-vosafe="true" onclick="switchGradeScaleType('hitter')">Hitter</button>
@@ -3497,10 +3511,10 @@ tr.rank-row.rk-drag-below td { box-shadow:inset 0 -2px 0 var(--accent); }
         </div><!-- end #r_editor_pit -->
       </div><!-- end #gradesPitcher -->
       <div class="form-field" style="margin-top:16px;">
-        <label class="form-label">Interest Level</label>
+        <label class="form-label">Grade Level</label>
         <div class="toggle-group" style="margin-bottom:0;">
           <button type="button" class="toggle-btn" id="rInterestLow"      onclick="setReportInterest('low')">Low</button>
-          <button type="button" class="toggle-btn active" id="rInterestStandard" onclick="setReportInterest('standard')">Standard</button>
+          <button type="button" class="toggle-btn active" id="rInterestStandard" onclick="setReportInterest('standard')">Medium</button>
           <button type="button" class="toggle-btn" id="rInterestHigh"     onclick="setReportInterest('high')">High</button>
         </div>
       </div>
@@ -5855,7 +5869,7 @@ function renderDetail() {
         ${p.level ? `<span class="hero-tag">${esc(p.level)}</span>` : ''}
         ${p.org ? `<span class="hero-tag">${esc(p.org)}</span>` : ''}
       </div>
-      <div class="hero-name">${esc(p.name)}${(() => { const il = getEffectiveInterest(p); const label = il === 'low' ? 'Low' : il === 'high' ? 'High' : 'Standard'; return `<span class="hero-interest int-${il}">${label}</span>`; })()}</div>
+      <div class="hero-name">${esc(p.name)}${(() => { const il = getEffectiveInterest(p); const label = il === 'low' ? 'Low' : il === 'high' ? 'High' : 'Medium'; return `<span class="hero-interest int-${il}">${label}</span>`; })()}</div>
       <div class="hero-meta-row">${pills}</div>
       ${_avgOFPHtml}
       <div class="hero-actions">
@@ -6020,7 +6034,7 @@ function buildPlayerCard(p) {
   const interestDot = (() => {
     const il = getEffectiveInterest(p);
     const color = il === 'low' ? '#d94f3d' : il === 'high' ? '#47c88a' : '#e6b432';
-    const label = il === 'low' ? 'Low Interest' : il === 'high' ? 'High Interest' : 'Standard Interest';
+    const label = il === 'low' ? 'Low' : il === 'high' ? 'High' : 'Medium';
     return `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0;" title="${label}"></span>`;
   })();
 
@@ -7472,6 +7486,10 @@ function _attachDragHandlers(tbody) {
 function setRankingsTab(tab) {
   document.getElementById('rk_tab_mlb')?.classList.toggle('active', tab === 'mlb');
   document.getElementById('rk_tab_prospects')?.classList.toggle('active', tab === 'prospects');
+  if (tab === 'mlb') {
+    const orgSel = document.getElementById('rk_filter_org');
+    if (orgSel && !orgSel.value) orgSel.value = 'Kansas City Royals';
+  }
   renderRankings();
 }
 
@@ -7603,7 +7621,7 @@ function _renderRankingsInner(feed) {
     const ftp = getPlayerFTP(p);
     const il = getEffectiveInterest(p);
     const intColor = il === 'high' ? '#47c88a' : il === 'low' ? '#d94f3d' : '#e6b432';
-    const ilLabel  = il === 'high' ? 'High' : il === 'low' ? 'Low' : 'Standard';
+    const ilLabel  = il === 'high' ? 'High' : il === 'low' ? 'Low' : 'Medium';
     const blurb = getPlayerBlurb(p);
     // Most recent level at time of scouting (report or follow), preferring the newer date
     const lastReportLevel = (p.reports||[]).filter(r => r.reportLevel).sort((a,b) => (b.date||'').localeCompare(a.date||''))[0]?.reportLevel || '';
@@ -7667,7 +7685,7 @@ function _renderRankingsInner(feed) {
         <th style="width:64px;">POS</th>
         <th class="center" style="width:64px;">FTP</th>
         <th class="center" style="width:110px;">Source</th>
-        <th style="width:110px;">Interest</th>
+        <th style="width:110px;">Grade Level</th>
         <th class="center" style="width:90px;">Seen At</th>
       </tr>
     </thead>
@@ -7688,9 +7706,9 @@ function _renderRankingsInner(feed) {
         <div class="rank-tier-line"></div>
         <span class="rank-tier-count">${count} player${count !== 1 ? 's' : ''}</span>
       </div></td></tr>`;
-    if (highPlayers.length) { rows += tierRow('#47c88a','High Interest',highPlayers.length); highPlayers.forEach(p => { rows += buildRow(p, rankCursor++); }); }
-    if (stdPlayers.length)  { rows += tierRow('#e6b432','Standard Interest',stdPlayers.length);  stdPlayers.forEach(p => { rows += buildRow(p, rankCursor++); }); }
-    if (lowPlayers.length)  { rows += tierRow('#d94f3d','Low Interest',lowPlayers.length);  lowPlayers.forEach(p => { rows += buildRow(p, rankCursor++); }); }
+    if (highPlayers.length) { rows += tierRow('#47c88a','High',highPlayers.length); highPlayers.forEach(p => { rows += buildRow(p, rankCursor++); }); }
+    if (stdPlayers.length)  { rows += tierRow('#e6b432','Medium',stdPlayers.length);  stdPlayers.forEach(p => { rows += buildRow(p, rankCursor++); }); }
+    if (lowPlayers.length)  { rows += tierRow('#d94f3d','Low',lowPlayers.length);  lowPlayers.forEach(p => { rows += buildRow(p, rankCursor++); }); }
   } else {
     players.forEach((p, i) => { rows += buildRow(p, i + 1); });
   }
@@ -9819,7 +9837,7 @@ renderDetail = function() {
           <span class="follow-card-tag">Follow</span>
           ${f.seenAs === 'prospect' ? '<span style="font-family:\'IBM Plex Mono\',monospace;font-size:8px;letter-spacing:.5px;background:rgba(230,180,50,.1);color:#e6b432;border:1px solid rgba(230,180,50,.3);padding:2px 6px;border-radius:3px;">PROSPECT</span>' : ''}
           ${f.seenAs === 'bigLeaguer' ? '<span style="font-family:\'IBM Plex Mono\',monospace;font-size:8px;letter-spacing:.5px;background:rgba(91,164,207,.12);color:var(--accent);border:1px solid rgba(91,164,207,.25);padding:2px 6px;border-radius:3px;">BIG LEAGUER</span>' : ''}
-          ${(() => { const fi = f.followInterest || ''; if (fi === 'high') return '<span style="font-family:\'IBM Plex Mono\',monospace;font-size:8px;letter-spacing:.5px;background:rgba(71,200,138,.1);color:#47c88a;border:1px solid rgba(71,200,138,.3);padding:2px 6px;border-radius:3px;">HIGH INT</span>'; if (fi === 'low') return '<span style="font-family:\'IBM Plex Mono\',monospace;font-size:8px;letter-spacing:.5px;background:rgba(217,79,61,.1);color:#d94f3d;border:1px solid rgba(217,79,61,.3);padding:2px 6px;border-radius:3px;">LOW INT</span>'; return ''; })()}
+          ${(() => { const fi = f.followInterest || ''; if (fi === 'high') return '<span style="font-family:\'IBM Plex Mono\',monospace;font-size:8px;letter-spacing:.5px;background:rgba(71,200,138,.1);color:#47c88a;border:1px solid rgba(71,200,138,.3);padding:2px 6px;border-radius:3px;">HIGH</span>'; if (fi === 'low') return '<span style="font-family:\'IBM Plex Mono\',monospace;font-size:8px;letter-spacing:.5px;background:rgba(217,79,61,.1);color:#d94f3d;border:1px solid rgba(217,79,61,.3);padding:2px 6px;border-radius:3px;">LOW</span>'; return ''; })()}
           <span class="follow-card-game">${gameLabel}</span>
           <span class="follow-card-date">${f.date ? fmtDate(f.date) : ''}</span>
         </div>
@@ -9993,10 +10011,10 @@ function openEditFollowModal(playerId, followId) {
           </div>
         </div>
         <div>
-          <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--accent);margin-bottom:8px;">Interest Level</div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--accent);margin-bottom:8px;">Grade Level</div>
           <div style="display:flex;gap:8px;">
             <button type="button" id="fe_followIntLowBtn" onclick="setFollowInterest('fe_','low')" style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:1px;padding:8px 14px;border-radius:4px;cursor:pointer;border:1px solid var(--faint);background:transparent;color:var(--dim);transition:all .15s;" class="${(f.followInterest||'') === 'low' ? 'active' : ''}">Low</button>
-            <button type="button" id="fe_followIntStdBtn" onclick="setFollowInterest('fe_','standard')" style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:1px;padding:8px 14px;border-radius:4px;cursor:pointer;border:1px solid var(--faint);background:transparent;color:var(--dim);transition:all .15s;" class="${(f.followInterest||'') === 'standard' ? 'active' : ''}">Standard</button>
+            <button type="button" id="fe_followIntStdBtn" onclick="setFollowInterest('fe_','standard')" style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:1px;padding:8px 14px;border-radius:4px;cursor:pointer;border:1px solid var(--faint);background:transparent;color:var(--dim);transition:all .15s;" class="${(f.followInterest||'') === 'standard' ? 'active' : ''}">Medium</button>
             <button type="button" id="fe_followIntHighBtn" onclick="setFollowInterest('fe_','high')" style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:1px;padding:8px 14px;border-radius:4px;cursor:pointer;border:1px solid var(--faint);background:transparent;color:var(--dim);transition:all .15s;" class="${(f.followInterest||'') === 'high' ? 'active' : ''}">High</button>
           </div>
         </div>
@@ -10087,10 +10105,10 @@ function openAddFollowModal(playerId) {
           </div>
         </div>
         <div>
-          <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--accent);margin-bottom:8px;">Interest Level</div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--accent);margin-bottom:8px;">Grade Level</div>
           <div style="display:flex;gap:8px;">
             <button type="button" id="af_followIntLowBtn" onclick="setFollowInterest('af_','low')" style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:1px;padding:8px 14px;border-radius:4px;cursor:pointer;border:1px solid var(--faint);background:transparent;color:var(--dim);transition:all .15s;">Low</button>
-            <button type="button" id="af_followIntStdBtn" onclick="setFollowInterest('af_','standard')" style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:1px;padding:8px 14px;border-radius:4px;cursor:pointer;border:1px solid var(--faint);background:transparent;color:var(--dim);transition:all .15s;">Standard</button>
+            <button type="button" id="af_followIntStdBtn" onclick="setFollowInterest('af_','standard')" style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:1px;padding:8px 14px;border-radius:4px;cursor:pointer;border:1px solid var(--faint);background:transparent;color:var(--dim);transition:all .15s;">Medium</button>
             <button type="button" id="af_followIntHighBtn" onclick="setFollowInterest('af_','high')" style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:1px;padding:8px 14px;border-radius:4px;cursor:pointer;border:1px solid var(--faint);background:transparent;color:var(--dim);transition:all .15s;">High</button>
           </div>
         </div>
