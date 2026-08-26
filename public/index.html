@@ -6191,9 +6191,9 @@ function renderReports() {
     return [...players].sort((a, b) => {
       if (sortBy === 'player_az') return a.name.localeCompare(b.name);
       if (sortBy === 'player_za') return b.name.localeCompare(a.name);
-      if (sortBy === 'ofp_desc')  return getPlayerFTP(b) - getPlayerFTP(a);
-      // default: OFP desc
-      return getPlayerFTP(b) - getPlayerFTP(a);
+      const gradeDiff = getPlayerFTP(b) - getPlayerFTP(a);
+      if (gradeDiff !== 0) return gradeDiff;
+      return interestScore(getEffectiveInterest(b)) - interestScore(getEffectiveInterest(a));
     });
   };
 
