@@ -4742,6 +4742,7 @@ function saveReport() {
     date,
     location:          document.getElementById('r_location').value.trim(),
     reportLevel:       document.getElementById('r_report_level').value || '',
+    org:               p.org || '',
     text,
     impact:            document.getElementById('r_impact').value.trim(),
     playerType,
@@ -4782,6 +4783,35 @@ function confirmDeleteReport(rid) {
 }
 
 // ── CALC AGE ─────────────────────────────────────────────────────────────────
+
+// All positions a player has actually been entered at on the scorecard, primary
+// position first, deduplicated. e.g. a player added as SS whose follows also
+// include a 2B appearance shows as "SS, 2B". Same mechanism covers SP/RP.
+function getPlayerPositions(p) {
+  const positions = [];
+  const add = (pos) => {
+    const clean = (pos || '').trim().toUpperCase();
+    if (clean && !positions.includes(clean)) positions.push(clean);
+  };
+  add(p.position);
+  (p.follows || []).forEach(f => add(f.position));
+  return positions;
+}
+
+// The player's CURRENT org — whichever follow or report is most recent by date,
+// not the static org field set once when the player was first added.
+function getPlayerCurrentOrg(p) {
+  const candidates = [];
+  (p.follows || []).forEach(f => {
+    if (f.org) candidates.push({ date: f.date || f.updatedAt || '', org: f.org });
+  });
+  (p.reports || []).forEach(r => {
+    if (r.org) candidates.push({ date: r.date || r.updatedAt || '', org: r.org });
+  });
+  if (!candidates.length) return p.org || '';
+  candidates.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  return candidates[0].org;
+}
 
 function calcAge(birthdate) {
   if (!birthdate) return null;
@@ -5775,10 +5805,12 @@ function renderDetail() {
   detailDiv.style.display  = 'block';
 
   // Bio pills
+  const _positions = getPlayerPositions(p);
+  const _currentOrg = getPlayerCurrentOrg(p);
   const pills = [
-    p.position && `<span class="bio-pill accent">${esc(p.position)}</span>`,
+    _positions.length && `<span class="bio-pill accent">${esc(_positions.join(', '))}</span>`,
     p.level    && `<span class="bio-pill level">${esc(p.level)}</span>`,
-    p.org      && `<span class="bio-pill">${esc(p.org)}</span>`,
+    _currentOrg && `<span class="bio-pill">${esc(_currentOrg)}</span>`,
     p.bats && p.throws && `<span class="bio-pill">B/T: ${esc(p.bats)}/${esc(p.throws)}</span>`,
     p.birthdate && calcAge(p.birthdate) !== null && `<span class="bio-pill">Age ${calcAge(p.birthdate).toFixed(1)}</span>`,
   ].filter(Boolean).join('');
@@ -5867,7 +5899,7 @@ function renderDetail() {
       <div class="hero-eyebrow">
         ${p.position ? `<span class="hero-pos-badge">${esc(p.position)}</span>` : ''}
         ${p.level ? `<span class="hero-tag">${esc(p.level)}</span>` : ''}
-        ${p.org ? `<span class="hero-tag">${esc(p.org)}</span>` : ''}
+        ${_currentOrg ? `<span class="hero-tag">${esc(_currentOrg)}</span>` : ''}
       </div>
       <div class="hero-name">${esc(p.name)}${(() => { const il = getEffectiveInterest(p); const label = il === 'low' ? 'Low' : il === 'high' ? 'High' : 'Medium'; return `<span class="hero-interest int-${il}">${label}</span>`; })()}</div>
       <div class="hero-meta-row">${pills}</div>
@@ -5990,9 +6022,10 @@ function buildPlayerCard(p) {
   const ageStr = age !== null ? age.toFixed(1) : null;
   const reports = p.reports || [];
   const follows = p.follows || [];
+  const currentOrg = getPlayerCurrentOrg(p);
 
   const metaParts = [
-    p.org   || null,
+    currentOrg || null,
     p.level || null,
     ageStr  ? 'Age ' + ageStr : null,
     (p.bats && p.throws) ? 'B/T: ' + p.bats[0] + '/' + p.throws[0] : null,
@@ -6005,7 +6038,7 @@ function buildPlayerCard(p) {
   const ofpVal     = grades[ofpKey] ? String(grades[ofpKey]) : '';
   const ofpClass   = ofpVal ? gradeClass(ofpVal) : '';
 
-  const levelOrg = [p.level, p.org].filter(Boolean).join(' &nbsp;●&nbsp; ');
+  const levelOrg = [p.level, currentOrg].filter(Boolean).join(' &nbsp;●&nbsp; ');
 
   // Average OFP — reports take priority; only fall back to follows if no report has an OFP grade
   const ofpValues = [];
@@ -6167,16 +6200,17 @@ function renderReports() {
     else                           { _lvLbl.textContent = fLevels.length + ' Levels'; _lvBtn.classList.add('active'); }
   }
 
-  const isAmateurPlayer = p => (['College','High School'].includes(p.level)) && !p.org;
+  const isAmateurPlayer = p => (['College','High School'].includes(p.level)) && !getPlayerCurrentOrg(p);
   let allPlayers = state.players.filter(p => !isAmateurPlayer(p));
 
   // Apply filters
   allPlayers = allPlayers.filter(p => {
     const reports = p.reports || [];
-    const allText = p.name.toLowerCase() + ' ' + (p.org||'').toLowerCase() +
+    const currentOrg = getPlayerCurrentOrg(p);
+    const allText = p.name.toLowerCase() + ' ' + currentOrg.toLowerCase() +
       ' ' + reports.map(r => (r.text||'') + ' ' + (r.location||'')).join(' ').toLowerCase();
     if (fPos    && p.position !== fPos)   return false;
-    if (fOrg    && p.org      !== fOrg)   return false;
+    if (fOrg    && currentOrg !== fOrg)   return false;
     if (fLevels.length > 0 && !fLevels.includes(p.level)) return false;
     if (fBats   && p.bats     !== fBats)  return false;
     if (fPtype  && !reports.some(r => r.playerType === fPtype)) return false;
@@ -6192,10 +6226,12 @@ function renderReports() {
   const feed = document.getElementById('reportsFeed');
   if (!feed) return;
 
-  // Group players by org
+  // Group players by their CURRENT org (most recent follow/report), not the
+  // static field — this is what actually makes a player move sections here the
+  // moment a new follow/report puts them on a different team.
   const byOrg = {};
   allPlayers.forEach(p => {
-    const org = p.org || 'Other';
+    const org = getPlayerCurrentOrg(p) || 'Other';
     if (!byOrg[org]) byOrg[org] = [];
     byOrg[org].push(p);
   });
@@ -6214,7 +6250,7 @@ function renderReports() {
   // Determine which orgs to show: all 30 MLB orgs, plus any extras (Independent etc.)
   const hasFilter = fOrg || fPos || fLevels.length || fBats || fPtype || fProspect || search;
   let orgsToShow = hasFilter
-    ? [...new Set(allPlayers.map(p => p.org || 'Other'))].sort()
+    ? [...new Set(allPlayers.map(p => getPlayerCurrentOrg(p) || 'Other'))].sort()
     : [...MLB_ORGS, ...Object.keys(byOrg).filter(o => !MLB_ORGS.includes(o) && o !== 'Other').sort()];
   if (byOrg['Other']) orgsToShow.push('Other');
 
@@ -7519,7 +7555,7 @@ function _renderRankingsInner(feed) {
   let filterOrg = '';
   if (orgSel) {
     const currentOrg = orgSel.value;
-    const orgs = [...new Set(state.players.map(p => p.org).filter(Boolean))].sort();
+    const orgs = [...new Set(state.players.map(p => getPlayerCurrentOrg(p)).filter(Boolean))].sort();
     orgSel.innerHTML = '<option value="">All Orgs</option>' +
       orgs.map(o => '<option value="' + esc(o) + '"' + (o === currentOrg ? ' selected' : '') + '>' + esc(o) + '</option>').join('');
     filterOrg = orgSel.value;
@@ -7528,34 +7564,29 @@ function _renderRankingsInner(feed) {
   const customOrder = loadRankOrder();
 
   // Get all pro players who have at least one report or follow
-  const _rejectLog = [];
   let players = state.players.filter(p => {
-    if (p.playerCategory === 'amateur') { _rejectLog.push([p.name, 'playerCategory=amateur']); return false; }
-    if (['College','High School'].includes(p.level) && !p.org) { _rejectLog.push([p.name, 'College/HS level with no org']); return false; }
-    if (!(p.reports?.length || p.follows?.length)) { _rejectLog.push([p.name, 'no reports or follows']); return false; }
-    if (filterInterest && getEffectiveInterest(p) !== filterInterest) { _rejectLog.push([p.name, 'interest filter (' + filterInterest + ')']); return false; }
-    if (filterPos && p.position !== filterPos) { _rejectLog.push([p.name, 'position filter (' + filterPos + ')']); return false; }
-    if (filterOrg && p.org !== filterOrg) { _rejectLog.push([p.name, 'org filter (' + filterOrg + ')']); return false; }
+    if (p.playerCategory === 'amateur') return false;
+    if (['College','High School'].includes(p.level) && !getPlayerCurrentOrg(p)) return false;
+    if (!(p.reports?.length || p.follows?.length)) return false;
+    if (filterInterest && getEffectiveInterest(p) !== filterInterest) return false;
+    if (filterPos && p.position !== filterPos) return false;
+    if (filterOrg && getPlayerCurrentOrg(p) !== filterOrg) return false;
     if (rankTab === 'prospects') {
       // Not currently on an MLB roster — the reliable signal is the player's own level
       // field, not the "Written as Prospect" checkbox on individual reports (easy to
       // forget, and left most real prospects out entirely when it was the only gate).
       const isCurrentlyMlb = (p.level || '').toUpperCase() === 'MLB';
-      if (isCurrentlyMlb) { _rejectLog.push([p.name, 'prospects tab: level is MLB']); return false; }
+      if (isCurrentlyMlb) return false;
     }
     if (rankTab === 'mlb') {
       // Currently MLB-level, OR has a report/follow explicitly logged at the MLB level
       const isCurrentlyMlb = (p.level || '').toUpperCase() === 'MLB';
       const hasMlbReport = (p.reports || []).some(r => (r.reportLevel || '').toUpperCase() === 'MLB');
       const hasMlbFollow = (p.follows || []).some(f => (f.followLevel || '').toUpperCase() === 'MLB');
-      if (!isCurrentlyMlb && !hasMlbReport && !hasMlbFollow) { _rejectLog.push([p.name, 'mlb tab: no MLB level/report/follow (level=' + (p.level||'—') + ')']); return false; }
+      if (!isCurrentlyMlb && !hasMlbReport && !hasMlbFollow) return false;
     }
     return true;
   });
-
-  console.log(`[RANKINGS DEBUG] tab=${rankTab} | total players=${state.players.length} | passed=${players.length} | rejected=${_rejectLog.length}`);
-  if (_rejectLog.length) console.table(_rejectLog.map(([name, reason]) => ({ name, reason })));
-  if (players.length) console.log('[RANKINGS DEBUG] passed:', players.map(p => p.name));
 
   // Sort — drag mode only. Stored order is canonical; new players slot in by OFP → interest
   if (isDragMode) {
@@ -7640,6 +7671,7 @@ function _renderRankingsInner(feed) {
     const gradeSource = getGradeSource(p);
     const gradeSourceColor = gradeSource === 'Report' ? '#47c88a' : gradeSource === 'Follow' ? '#5ba4cf' : 'var(--text4)';
     const ofpColor = gradeColorHex(ftp);
+    const rowCurrentOrg = getPlayerCurrentOrg(p);
 
     return `<tr class="rank-row rank-row-${il}" data-pid="${p.id}" draggable="${isDragMode}" onclick="goToRankPlayer('${p.id}')">
       ${dragHandle}
@@ -7648,7 +7680,7 @@ function _renderRankingsInner(feed) {
         <div style="display:flex;align-items:center;gap:8px;">
           <div>
             <div class="rank-name">${esc(p.name)}${prospectBadge}</div>
-            <div class="rank-name-sub">${esc(p.org) || ''}${p.org && p.level ? ' · ' : ''}${esc(p.level) || ''}</div>
+            <div class="rank-name-sub">${esc(rowCurrentOrg) || ''}${rowCurrentOrg && p.level ? ' · ' : ''}${esc(p.level) || ''}</div>
           </div>
           <button class="rank-expand-btn" id="rankExpandBtn_${p.id}" onclick="event.stopPropagation();toggleRankExpand('${p.id}')" title="Show tool grades and impact statement">▾</button>
         </div>
@@ -9176,8 +9208,10 @@ function finishGame() {
       updatedAt: new Date().toISOString(),
       type: 'follow',
       entryType: batter.entryType || 'batter',
+      position: batter.position || '',
       date: activeGame.date,
       gameId: activeGame.id,
+      org: batter.side === 'away' ? (activeGame.away||'') : (activeGame.home||''),
       awayTeam: activeGame.away,
       homeTeam: activeGame.home,
       venue: activeGame.venue,
@@ -10672,7 +10706,7 @@ function saveFollowEdit(playerId, followId) {
 // A player needs a report if they are a pro player, have at least one follow, and have no written report
 function isProPlayer(p) {
   if (p.playerCategory === 'amateur') return false;
-  if (['College','High School'].includes(p.level) && !p.org) return false;
+  if (['College','High School'].includes(p.level) && !getPlayerCurrentOrg(p)) return false;
   return true;
 }
 var PRO_LEVELS = ['MLB','AAA','AA','A+','A','Rookie','DSL'];
@@ -10740,7 +10774,7 @@ function renderChecklist() {
   var orgSel = document.getElementById('cl_filter_org');
   if (orgSel) {
     var currentOrg = orgSel.value;
-    var orgs = [...new Set(allPlayers.map(p => p.org).filter(Boolean))].sort();
+    var orgs = [...new Set(allPlayers.map(p => getPlayerCurrentOrg(p)).filter(Boolean))].sort();
     orgSel.innerHTML = '<option value="">All Orgs</option>' +
       orgs.map(o => '<option value="' + o + '"' + (o === currentOrg ? ' selected' : '') + '>' + o + '</option>').join('');
   }
@@ -10754,7 +10788,7 @@ function renderChecklist() {
 
   var players = allPlayers
     .filter(function(p) {
-      if (filterOrg   && p.org   !== filterOrg)   return false;
+      if (filterOrg   && getPlayerCurrentOrg(p) !== filterOrg)   return false;
       if (filterLevel && p.level !== filterLevel) return false;
       if (filterGrade) {
         var hasGrade = getGradeSource(p) !== '—';
@@ -10780,7 +10814,7 @@ function renderChecklist() {
       '<div>' +
         '<div style="font-family:&apos;Bebas Neue&apos;,sans-serif;font-size:20px;letter-spacing:2px;color:#f0f0f2;">' + esc(p.name) + '</div>' +
         '<div style="font-family:&apos;IBM Plex Mono&apos;,monospace;font-size:9px;color:#55556a;margin-top:3px;">' +
-          [p.position, p.org, p.level].filter(Boolean).join(' · ') +
+          [p.position, getPlayerCurrentOrg(p), p.level].filter(Boolean).join(' · ') +
         '</div>' +
       '</div>' +
       '<div style="display:flex;align-items:center;gap:10px;">' +
