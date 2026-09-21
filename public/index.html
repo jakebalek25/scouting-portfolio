@@ -5428,7 +5428,7 @@ const SCOUT_PITCH_KEYS = ['fb','si','sl','cb','ch','ct','spl','other'];
 // Canonical display order for the live Pitch Arsenal editor / follow display —
 // pitches always sort into this order regardless of entry order. Anything typed
 // that doesn't match one of these abbreviations sorts to the end, in entry order.
-const PITCH_ARSENAL_ORDER = ['FF', 'SI', 'CH', 'FC', 'FS', 'CB', 'SL', 'SW', 'KC'];
+const PITCH_ARSENAL_ORDER = ['FF', 'SI', 'FC', 'CH', 'FS', 'CB', 'SL', 'SW', 'KC'];
 function pitchArsenalSortIndex(name) {
   const idx = PITCH_ARSENAL_ORDER.indexOf((name || '').trim().toUpperCase());
   return idx === -1 ? PITCH_ARSENAL_ORDER.length : idx;
@@ -6201,7 +6201,7 @@ function renderReports() {
   }
 
   const isAmateurPlayer = p => (['College','High School'].includes(p.level)) && !getPlayerCurrentOrg(p);
-  let allPlayers = state.players.filter(p => !isAmateurPlayer(p));
+  let allPlayers = state.players.filter(p => !isAmateurPlayer(p) && getPlayerFTP(p) > 0);
 
   // Apply filters
   allPlayers = allPlayers.filter(p => {
@@ -7567,7 +7567,7 @@ function _renderRankingsInner(feed) {
   let players = state.players.filter(p => {
     if (p.playerCategory === 'amateur') return false;
     if (['College','High School'].includes(p.level) && !getPlayerCurrentOrg(p)) return false;
-    if (!(p.reports?.length || p.follows?.length)) return false;
+    if (getPlayerFTP(p) <= 0) return false;
     if (filterInterest && getEffectiveInterest(p) !== filterInterest) return false;
     if (filterPos && p.position !== filterPos) return false;
     if (filterOrg && getPlayerCurrentOrg(p) !== filterOrg) return false;
