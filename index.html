@@ -1672,6 +1672,16 @@ input.vo-locked,textarea.vo-locked{cursor:default;}
 .rk-section-btn.active { background:var(--accent); color:#09090b; border-color:var(--accent); }
 .rk-section-row + .rankings-controls { margin-top:16px; }
 /* Free agency filters: their own row inside the filter bar, only shown on Available */
+/* Amateur tab: one dropdown per draft class */
+.am-class { background:var(--surface); border:1px solid var(--border); border-radius:10px; margin-bottom:10px; }
+.am-class > summary { cursor:pointer; list-style:none; display:flex; align-items:center; gap:14px; padding:14px 18px; flex-wrap:wrap; }
+.am-class > summary::-webkit-details-marker { display:none; }
+.am-class .am-arrow { font-size:11px; color:var(--accent); display:inline-block; transition:transform .15s; }
+.am-class[open] .am-arrow { transform:rotate(90deg); }
+.am-class .am-class-name { font-family:'Bebas Neue',sans-serif; font-size:26px; letter-spacing:3px; color:var(--text); line-height:1; }
+.am-class .am-class-count { font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:1px; color:var(--text3); }
+.am-class-body { padding:0 18px 10px; border-top:1px solid var(--border); }
+.am-class-empty { font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--text3); padding:18px 2px 10px; line-height:1.6; }
 .rk-fa-row { display:flex; flex-wrap:wrap; align-items:center; gap:10px; width:100%; padding-top:12px; margin-top:2px; border-top:1px solid var(--border); }
 @media (max-width:800px) {
   .rk-section-row { gap:8px; }
@@ -2225,7 +2235,7 @@ tr.rank-row.rk-drag-below td { box-shadow:inset 0 -2px 0 var(--accent); }
   <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:4px;">
     <div>
       <div class="rankings-page-hed">Pro Prospect Rankings</div>
-      <div class="rankings-page-sub">Drag to set your order — or use a sort mode as a starting point</div>
+      <div class="rankings-page-sub">Ordered by grade, then High / Medium / Low — drag to rank players who are tied</div>
     </div>
     <div style="display:flex;gap:10px;flex-shrink:0;margin-top:8px;">
       <button class="btn btn-ghost btn-sm" data-vosafe="true" onclick="switchTab('reports')" style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:1px;">View Reports →</button>
@@ -2317,7 +2327,7 @@ tr.rank-row.rk-drag-below td { box-shadow:inset 0 -2px 0 var(--accent); }
       <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--text3);">Low</span>
     </div>
     <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
-      <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--text3);">In Custom Order mode — grab ⠿ to drag rows into position. Order saves automatically.</span>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--text3);">Ordered by grade, then High / Medium / Low. Grab ⠿ to rank players who are fully tied; new arrivals land at the bottom of their group.</span>
     </div>
   </div>
 
@@ -3147,6 +3157,13 @@ tr.rank-row.rk-drag-below td { box-shadow:inset 0 -2px 0 var(--accent); }
         </div>
       </div>
 
+      <div class="form-row">
+        <div class="form-field">
+          <label class="form-label">Draft Class <span style="color:var(--text4);">(amateurs)</span></label>
+          <select class="form-select" id="f_draftClass"><option value="">—</option></select>
+        </div>
+      </div>
+
       <div class="form-section-hed">Free Agency Tag</div>
       <div class="form-row">
         <div class="form-field">
@@ -3698,6 +3715,13 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 
 const ADMIN_TOKEN = 'jake14balek27';
 const ALL_VIEW_ONLY_TAB_IDS = ['tab-reports', 'tab-amateur', 'tab-rankings', 'tab-gradescale', 'tab-scorecard', 'tab-checklist', 'tab-about'];
+
+// Tabs on standby: hidden from the nav and unreachable, but every bit of their code
+// and data is still here. To bring one back, delete it from this list.
+const STANDBY_TABS = ['about', 'checklist'];   // Projects, To-Do
+function applyStandbyTabs() {
+  STANDBY_TABS.forEach(n => { const b = document.getElementById('tab-' + n); if (b) b.style.display = 'none'; });
+}
 const DEFAULT_VIEW_ONLY_VISIBLE = ['reports', 'rankings', 'gradescale', 'about'];
 const VIEW_ONLY_LAST_CHOICE_KEY = 'jake_vo_last_tabs';
 
@@ -3821,6 +3845,7 @@ function togglePublicTabVisibility(suffix) {
   const idx = hidden.indexOf(suffix);
   if (idx === -1) hidden.push(suffix); else hidden.splice(idx, 1);
   state.publicHiddenTabs = hidden;
+  state.publicHiddenTabsAt = new Date().toISOString();
   saveState();
   renderViewOnlyLinkDropdown();
 }
@@ -3865,7 +3890,7 @@ function renderViewOnlyLinkDropdown() {
   if (!panel) return;
   const url = getPublicSiteUrl();
   const hidden = getPublicHiddenTabs();
-  const checklistHtml = PUBLIC_TAB_OPTIONS.map(([suffix, label]) => `
+  const checklistHtml = PUBLIC_TAB_OPTIONS.filter(([s]) => !STANDBY_TABS.includes(s)).map(([suffix, label]) => `
     <label class="vo-tab-check">
       <input type="checkbox" ${hidden.includes(suffix) ? '' : 'checked'} onchange="togglePublicTabVisibility('${suffix}')">
       ${esc(label)}
@@ -4157,6 +4182,20 @@ function mergeRemoteIntoState(remote) {
   state.players = Object.values(playerMap);
 
   if (remote.selectedId) state.selectedId = remote.selectedId;
+
+  // Settings that live on the state itself rather than on a player. They have to be
+  // carried across explicitly or they never leave the device that set them.
+  // publicHiddenTabs: edited only on the private site. The public (read-only) site always
+  // takes the cloud's copy; the private site keeps its own unless the cloud's is newer.
+  {
+    const rAt = remote.publicHiddenTabsAt || '', lAt = state.publicHiddenTabsAt || '';
+    if (remote.publicHiddenTabs !== undefined && (VIEW_ONLY_MODE || state.publicHiddenTabs === undefined || rAt > lAt)) {
+      state.publicHiddenTabs = remote.publicHiddenTabs;
+      state.publicHiddenTabsAt = remote.publicHiddenTabsAt;
+    }
+    // One-time migrations that have already run anywhere (union, so none ever re-runs)
+    if (remote.migrations) state.migrations = { ...remote.migrations, ...(state.migrations || {}) };
+  }
 
   // Draft — only restore if genuinely unfinished, only if local has no draft of its own
   // (a local in-progress draft on THIS device should never be clobbered by a merge), AND
@@ -4541,9 +4580,42 @@ function addAvailablePlayer() {
   openAddPlayerModal({ year, type, level: type === 'mlfa' ? 'MLB' : '' });
 }
 
+// One-time: put every amateur currently on the Amateur tab into the 2026 class.
+// Only fills in players with NO class yet (never overwrites one you've set), and only
+// ever runs once, so amateurs you add later (e.g. the 2027 class) are left alone.
+function migrateAmateurClass2026() {
+  if (VIEW_ONLY_MODE) return null;
+  state.migrations = state.migrations || {};
+  if (state.migrations.amateurClass2026) return null;
+  const now = new Date().toISOString();
+  let moved = 0, alreadyHadClass = 0;
+  (state.players || []).forEach(p => {
+    if (!['College', 'High School'].includes(p.level)) return;   // same test the Amateur tab uses
+    if (p.draftClass) { alreadyHadClass++; return; }
+    p.draftClass = '2026';
+    p.updatedAt = now;   // so this change wins when devices merge
+    moved++;
+  });
+  state.migrations.amateurClass2026 = true;
+  saveState();
+  if (moved) showSyncStatus('Amateur tab: ' + moved + ' player' + (moved !== 1 ? 's' : '') + ' set to the 2026 class', false);
+  return { moved, alreadyHadClass };
+}
+
+function populateDraftClassSelect(current) {
+  const sel = document.getElementById('f_draftClass');
+  if (!sel) return;
+  const yr = new Date().getFullYear(), years = [];
+  for (let y = yr + 3; y >= 2000; y--) years.push(String(y));
+  if (current && !years.includes(String(current))) years.push(String(current));   // never drop an existing value
+  sel.innerHTML = '<option value="">—</option>' + years.map(y => `<option value="${y}">${y}</option>`).join('');
+  sel.value = current ? String(current) : '';
+}
+
 function openAddPlayerModal(prefill) {
   state.editingPlayerId = null;
   populateFaSelects(prefill?.year || '', prefill?.type || '');
+  populateDraftClassSelect('');
   document.getElementById('playerModalTitle').textContent = 'New Player Profile';
   ['name','position','org','level','birthdate','height','weight','bats','throws','hometown',
    'draftYear','draftRound','draftPick','school','amateurBonus','intlClass','intlBonus']
@@ -4566,6 +4638,7 @@ function openEditPlayerModal(id) {
   set('f_org',        p.org);
   set('f_level',      p.level);
   populateFaSelects(p.faYear, p.faType);
+  populateDraftClassSelect(p.draftClass);
   set('f_birthdate',  p.birthdate);
   set('f_height',     p.height);
   set('f_weight',     p.weight);
@@ -4593,6 +4666,7 @@ function savePlayer() {
     level:         document.getElementById('f_level').value,
     faYear:        document.getElementById('f_faYear')?.value || '',
     faType:        document.getElementById('f_faType')?.value || '',
+    draftClass:    document.getElementById('f_draftClass')?.value || '',
     birthdate:     document.getElementById('f_birthdate').value,
     height:        document.getElementById('f_height').value,
     weight:        document.getElementById('f_weight').value,
@@ -6178,6 +6252,8 @@ function updateCountBadge() {
 // ── TAB SWITCHING ─────────────────────────────────────────────────────────────
 
 function switchTab(name) {
+  if (STANDBY_TABS.includes(name)) name = 'reports'; // a tab on standby can't be opened, even from a saved last-tab or a link
+  applyStandbyTabs();
   // Defensive flush: force a save any time we're navigating away from Scorecard
   // with a game in progress — redundant with the per-field saves already in
   // place, but cheap insurance against any edit path that might not trigger one.
@@ -7572,6 +7648,35 @@ function saveRankOrder(arr) {
   try { localStorage.setItem(RANK_ORDER_KEY, JSON.stringify(arr)); } catch(e) {}
 }
 
+// Order is decided by grade, then grade level (High / Medium / Low). The saved drag
+// order only ever breaks ties between players with the same grade AND grade level.
+// To keep "new arrivals land at the bottom of their group" true, remember each
+// player's grade + level as of the last render: when either changes, move them to
+// the end of the saved order, which is the bottom of whatever tie group they join.
+const RANK_META_KEY = 'jake_scouting_rank_meta';
+function loadRankMeta() {
+  try { return JSON.parse(localStorage.getItem(RANK_META_KEY) || '{}'); } catch(e) { return {}; }
+}
+function saveRankMeta(m) {
+  try { localStorage.setItem(RANK_META_KEY, JSON.stringify(m)); } catch(e) {}
+}
+function reconcileRankMeta() {
+  const meta = loadRankMeta();
+  const order = loadRankOrder();
+  let orderChanged = false, metaChanged = false;
+  state.players.forEach(p => {
+    const key = getPlayerFTP(p) + '|' + getEffectiveInterest(p);
+    if (meta[p.id] === undefined) { meta[p.id] = key; metaChanged = true; return; } // first sighting: leave where it is
+    if (meta[p.id] !== key) {
+      meta[p.id] = key; metaChanged = true;
+      const i = order.indexOf(p.id);
+      if (i !== -1) { order.splice(i, 1); order.push(p.id); orderChanged = true; }
+    }
+  });
+  if (orderChanged) saveRankOrder(order);
+  if (metaChanged) saveRankMeta(meta);
+}
+
 // After a drag, update the stored order to reflect the new position
 function applyDragReorder(draggedId, targetId, insertBefore) {
   let order = loadRankOrder();
@@ -7783,18 +7888,11 @@ function setRankingsTab(tab) {
   document.getElementById('rk_tab_avail')?.classList.toggle('active', tab === 'available');
   const faBox = document.getElementById('rkFaControls');
   if (faBox) faBox.style.display = tab === 'available' ? 'flex' : 'none';
-  if (tab === 'available' && prevTab !== 'available') {
-    // The MLB tab defaults to Kansas City; don't carry that into the league-wide Available list.
-    const orgSelA = document.getElementById('rk_filter_org');
-    if (orgSelA) orgSelA.value = '';
-  }
-  if (tab === 'mlb') {
-    const orgSel = document.getElementById('rk_filter_org');
-    // Default to Kansas City Royals on switching to MLB with nothing already
-    // selected, rather than landing on the "select an org" prompt every time.
-    // Only applies on the switch itself — doesn't override an explicit later
-    // choice to clear the filter back to "All Orgs".
-    if (orgSel && !orgSel.value) orgSel.value = 'Kansas City Royals';
+  // Each section starts fresh: MLB on the Royals, Prospects and Available on all orgs.
+  // Only on an actual switch, so re-clicking the section you're on doesn't undo a club you picked.
+  if (tab !== prevTab) {
+    const orgSelT = document.getElementById('rk_filter_org');
+    if (orgSelT) orgSelT.value = tab === 'mlb' ? 'Kansas City Royals' : '';
   }
   renderRankings();
 }
@@ -7922,6 +8020,7 @@ function _renderRankingsInner(feed) {
     return;
   }
 
+  reconcileRankMeta();
   const customOrder = loadRankOrder();
 
   // Get all pro players who have at least one report or follow
@@ -7962,22 +8061,23 @@ function _renderRankingsInner(feed) {
     return true;
   });
 
-  // Sort — drag mode only. Stored order is canonical; new players slot in by OFP → interest
+  // Sort — grade, then grade level; the saved drag order only breaks full ties
   if (isDragMode) {
     const orderMap = {};
     customOrder.forEach((id, i) => { orderMap[id] = i; });
     players.sort((a, b) => {
-      const ia = orderMap[a.id] !== undefined ? orderMap[a.id] : null;
-      const ib = orderMap[b.id] !== undefined ? orderMap[b.id] : null;
-      // Both in order — use stored positions
-      if (ia !== null && ib !== null) return ia - ib;
-      // Only one in order — ordered player goes first
-      if (ia !== null) return -1;
-      if (ib !== null) return 1;
-      // Neither in order — sort by OFP desc, then interest desc
+      // 1) grade, 2) grade level — always decide the order
       const ftpDiff = getPlayerFTP(b) - getPlayerFTP(a);
       if (ftpDiff !== 0) return ftpDiff;
-      return interestScore(getEffectiveInterest(b)) - interestScore(getEffectiveInterest(a));
+      const lvlDiff = interestScore(getEffectiveInterest(b)) - interestScore(getEffectiveInterest(a));
+      if (lvlDiff !== 0) return lvlDiff;
+      // 3) fully tied: your dragged order; anyone without a saved spot goes to the bottom of the group
+      const ia = orderMap[a.id] !== undefined ? orderMap[a.id] : null;
+      const ib = orderMap[b.id] !== undefined ? orderMap[b.id] : null;
+      if (ia !== null && ib !== null) return ia - ib;
+      if (ia !== null) return -1;
+      if (ib !== null) return 1;
+      return (a.name || '').localeCompare(b.name || '');
     });
     // Persist any new players that weren't in order yet.
     // IMPORTANT: only modify the saved order when no filters are active — otherwise
@@ -7996,19 +8096,18 @@ function _renderRankingsInner(feed) {
       const newIds = allProIds.filter(id => !customOrder.includes(id));
       if (newIds.length > 0) {
         const merged = [...customOrder];
-        newIds.forEach(id => {
-          const p = state.players.find(x => x.id === id);
-          const ftp = getPlayerFTP(p);
-          let insertAt = merged.length;
-          for (let i = 0; i < merged.length; i++) {
-            const mp = state.players.find(x => x.id === merged[i]);
-            if (mp && getPlayerFTP(mp) < ftp) { insertAt = i; break; }
-          }
-          merged.splice(insertAt, 0, id);
-        });
+        // The saved order only breaks ties (grade and grade level decide everything else),
+        // so a newcomer simply goes on the end: the bottom of their tie group.
+        newIds.forEach(id => merged.push(id));
         saveRankOrder(merged);
       }
     }
+    // Give everyone on screen a saved spot, so dragging works for them too. Appending
+    // puts a newcomer at the bottom of their tie group, never above a higher grade/level.
+    const savedNow = loadRankOrder();
+    const savedSet = new Set(savedNow);
+    const unsaved = players.filter(p => !savedSet.has(p.id));
+    if (unsaved.length) saveRankOrder([...savedNow, ...unsaved.map(p => p.id)]);
   }
 
   const countEl = document.getElementById('rk_result_count');
@@ -8197,7 +8296,7 @@ function renderAmateurReports() {
     const currentVal = classEl.value;
     const classes = [...new Set(state.players
       .filter(p => (p.signingType==='amateur')||['College','High School','Rookie'].includes(p.level))
-      .map(p => p.draftClass).filter(Boolean))].sort((a,b)=>b-a);
+      .map(p => p.draftClass).filter(Boolean).concat([String(new Date().getFullYear() + 1)]))].sort((a,b)=>b-a);
     classEl.innerHTML = '<option value="">All Classes</option>' +
       classes.map(cl => `<option value="${cl}"${cl===currentVal?' selected':''}>${cl}</option>`).join('');
   }
@@ -8252,7 +8351,8 @@ function renderAmateurReports() {
   const feed = document.getElementById('amateurFeed');
   if (!feed) return;
 
-  if (players.length === 0) {
+  const upcomingClass = String(new Date().getFullYear() + 1);
+  if (players.length === 0 && fClass !== upcomingClass) {
     feed.innerHTML = `<div class="reports-empty">
       <div class="reports-empty-title">No Amateur Players Found</div>
       <div class="reports-empty-sub">Add players with College or High School level to see them here</div>
@@ -8260,8 +8360,38 @@ function renderAmateurReports() {
     return;
   }
 
-  feed.innerHTML = buildAmateurBoard(players);
+  // One dropdown per draft class, newest first. The class you're starting (next year's)
+  // always has a dropdown, even before anyone is in it; players with no class go last.
+  const hasOtherFilters = !!(search || fPos || fLevel || fPtype || fBats || fSign);
+  const byClass = {};
+  players.forEach(p => { const k = String(p.draftClass || '').trim() || '__none'; (byClass[k] = byClass[k] || []).push(p); });
+  let classKeys = Object.keys(byClass).filter(k => k !== '__none');
+  if (!hasOtherFilters && !fClass && !classKeys.includes(upcomingClass)) classKeys.push(upcomingClass);
+  if (fClass && !classKeys.includes(fClass)) classKeys.push(fClass);
+  classKeys.sort((a, b) => b.localeCompare(a));
+  if (byClass['__none']) classKeys.push('__none');
+  const newestWithPlayers = classKeys.find(k => k !== '__none' && (byClass[k] || []).length) || '';
+  const isOpen = k => (k in _amClassOpen) ? _amClassOpen[k]
+    : (hasOtherFilters || !!fClass || k === newestWithPlayers || k === '__none');
+
+  feed.innerHTML = classKeys.map(k => {
+    const list = byClass[k] || [];
+    const label = k === '__none' ? 'No Class' : k + ' Class';
+    const body = list.length
+      ? buildAmateurBoard(list)
+      : `<div class="am-class-empty">No players in the ${esc(k)} class yet. Add an amateur and set their Draft Class to ${esc(k)}, and they will show up here.</div>`;
+    return `<details class="am-class" data-class="${esc(k)}" ${isOpen(k) ? 'open' : ''}>
+      <summary onclick="noteAmateurClassClick(this.parentElement)"><span class="am-arrow">▶</span><span class="am-class-name">${esc(label)}</span><span class="am-class-count">${list.length} player${list.length !== 1 ? 's' : ''}</span></summary>
+      <div class="am-class-body">${body}</div>
+    </details>`;
+  }).join('');
 }
+
+// Which class dropdowns the user has opened/closed (remembered across re-renders)
+const _amClassOpen = {};
+function toggleAmateurClass(k, open) { _amClassOpen[k] = !!open; }
+// Record only real clicks. At click time `open` is still the state before the toggle.
+function noteAmateurClassClick(det) { if (det) toggleAmateurClass(det.dataset.class, !det.open); }
 
 function buildAmateurBoard(players) {
   if (players.length === 0) return '';
@@ -8471,6 +8601,7 @@ document.addEventListener('DOMContentLoaded', function() {
   showSyncStatus('↓ Loading from cloud…', false);
   Promise.all([loadFromSupabase(), loadArticlesFromSupabase(), loadGradeScaleFromSupabase()]).then(function(results) {
     if (results[0]) {
+      migrateAmateurClass2026();   // one-time, after the cloud copy has been merged in
       renderSidebar();
       renderDetail();
       updateCountBadge();
