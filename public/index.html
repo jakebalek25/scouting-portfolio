@@ -1703,6 +1703,11 @@ input.vo-locked,textarea.vo-locked{cursor:default;}
 .rank-reports-count {
   font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text3);text-align:center;
 }
+.club-avg > summary { cursor:pointer; display:flex; align-items:center; gap:10px; flex-wrap:wrap; list-style:none; }
+.club-avg > summary::-webkit-details-marker { display:none; }
+.club-avg .ca-arrow { display:inline-block; font-size:10px; color:var(--accent); transition:transform .15s; }
+.club-avg[open] .ca-arrow { transform:rotate(90deg); }
+.club-avg-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:6px; margin-top:12px; max-height:260px; overflow-y:auto; padding-right:2px; }
 .rank-expand-btn {
   background:rgba(91,164,207,.15);border:1px solid var(--accent);color:var(--accent);cursor:pointer;
   font-size:11px;width:22px;height:22px;flex-shrink:0;border-radius:5px;
@@ -2236,6 +2241,9 @@ tr.rank-row.rk-drag-below td { box-shadow:inset 0 -2px 0 var(--accent); }
       <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--text3);">In Custom Order mode — grab ⠿ to drag rows into position. Order saves automatically.</span>
     </div>
   </div>
+
+  <!-- MLB club averages (only populated on the MLB sub-tab) -->
+  <div id="rkClubAvgPanel" style="display:none;margin-bottom:18px;"></div>
 
   <!-- Rankings table -->
   <div id="rankingsFeed"></div>
@@ -7542,6 +7550,68 @@ function renderRankings() {
       <div class="rankings-empty-sub" style="margin-top:8px;">Open the browser console (F12) for the full error — screenshot it and send it over.</div>
     </div>`;
   }
+  try { renderClubAveragesPanel(); } catch (e) { console.error('[CLUB AVERAGES] render failed:', e); }
+}
+
+// ── MLB club averages ────────────────────────────────────────────────────────
+// For each club: the average current grade (same "most recent grade" used
+// everywhere else) of its MLB-level players that have a follow/report grade.
+// Org is the player's current org, so a traded player counts for their new club.
+let _clubAvgOpen = false; // collapsed by default so it never pushes the rankings list off-screen
+function toggleClubAvg(open) { _clubAvgOpen = !!open; }
+
+function computeMlbClubAverages() {
+  const byOrg = {};
+  state.players.forEach(p => {
+    if (p.playerCategory === 'amateur') return;
+    if ((p.level || '').toUpperCase() !== 'MLB') return;
+    const org = getPlayerCurrentOrg(p);
+    if (!org) return;
+    const g = getPlayerFTP(p);
+    if (g <= 0) return;
+    (byOrg[org] = byOrg[org] || []).push(g);
+  });
+  return Object.entries(byOrg)
+    .map(([org, grades]) => ({ org, n: grades.length, avg: grades.reduce((a, b) => a + b, 0) / grades.length }))
+    .sort((a, b) => b.avg - a.avg || b.n - a.n || a.org.localeCompare(b.org));
+}
+
+function pickClubFromAverages(org) {
+  const sel = document.getElementById('rk_filter_org');
+  if (!sel || !org) return;
+  sel.value = org;
+  renderRankings();
+}
+
+function renderClubAveragesPanel() {
+  const el = document.getElementById('rkClubAvgPanel');
+  if (!el) return;
+  const isMlb = document.getElementById('rk_tab_mlb')?.classList.contains('active');
+  const rows = isMlb ? computeMlbClubAverages() : [];
+  if (!rows.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  const selectedOrg = document.getElementById('rk_filter_org')?.value || '';
+  const chips = rows.map((r, i) => {
+    const isSel = r.org === selectedOrg;
+    return `<button type="button" data-vosafe="true" data-org="${esc(r.org)}" onclick="pickClubFromAverages(this.dataset.org)"
+      style="display:flex;align-items:center;gap:8px;text-align:left;cursor:pointer;background:${isSel ? 'rgba(91,164,207,.10)' : 'var(--card)'};border:1px solid ${isSel ? 'var(--accent)' : 'var(--border)'};border-radius:7px;padding:6px 9px;min-width:0;">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--text4);width:18px;flex-shrink:0;">${i + 1}</span>
+      <span style="flex:1;min-width:0;">
+        <span style="display:block;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;letter-spacing:.3px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(r.org)}</span>
+        <span style="display:block;font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--text3);margin-top:1px;">${r.n} player${r.n !== 1 ? 's' : ''}</span>
+      </span>
+      <span style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px;line-height:1;flex-shrink:0;color:${gradeColorHex(Math.round(r.avg))};">${r.avg.toFixed(1)}</span>
+    </button>`;
+  }).join('');
+  el.style.display = 'block';
+  el.innerHTML = `<details class="club-avg" ${_clubAvgOpen ? 'open' : ''} ontoggle="toggleClubAvg(this.open)" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 14px;">
+    <summary>
+      <span class="ca-arrow">▶</span>
+      <span style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;color:var(--text);">MLB Club Averages</span>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1px;color:var(--text3);">${rows.length} CLUBS · TAP TO ${_clubAvgOpen ? 'HIDE' : 'SHOW'}</span>
+    </summary>
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.5px;color:var(--text4);margin-top:8px;">Average current grade of each club's MLB-level players with a grade. Tap a club to filter the list.</div>
+    <div class="club-avg-grid">${chips}</div>
+  </details>`;
 }
 
 function _renderRankingsInner(feed) {
