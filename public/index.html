@@ -1708,6 +1708,8 @@ input.vo-locked,textarea.vo-locked{cursor:default;}
 .club-avg .ca-arrow { display:inline-block; font-size:10px; color:var(--accent); transition:transform .15s; }
 .club-avg[open] .ca-arrow { transform:rotate(90deg); }
 .club-avg-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:6px; margin-top:12px; max-height:260px; overflow-y:auto; padding-right:2px; }
+.bio-pill.fa { background:rgba(230,180,50,.12); border-color:rgba(230,180,50,.4); color:#e6b432; }
+.fa-badge { font-family:'IBM Plex Mono',monospace;font-size:8px;letter-spacing:1px;text-transform:uppercase;color:#e6b432;background:rgba(230,180,50,.1);border:1px solid rgba(230,180,50,.3);padding:1px 6px;border-radius:3px;margin-left:6px;white-space:nowrap;vertical-align:middle; }
 .rank-expand-btn {
   background:rgba(91,164,207,.15);border:1px solid var(--accent);color:var(--accent);cursor:pointer;
   font-size:11px;width:22px;height:22px;flex-shrink:0;border-radius:5px;
@@ -2219,6 +2221,40 @@ tr.rank-row.rk-drag-below td { box-shadow:inset 0 -2px 0 var(--accent); }
     </select>
     <button id="rk_tab_mlb" class="rankings-sort-btn" onclick="setRankingsTab('mlb')">MLB</button>
     <button id="rk_tab_prospects" class="rankings-sort-btn active" onclick="setRankingsTab('prospects')">Prospects</button>
+    <button id="rk_tab_avail" class="rankings-sort-btn" onclick="setRankingsTab('available')" title="Players tagged as free agents / Rule 5 / non-tenders">Available</button>
+    <span id="rkFaControls" style="display:none;">
+      <div class="rankings-filter-sep"></div>
+      <span class="rankings-controls-label">Available</span>
+      <select id="rk_filter_fa_year" data-vosafe="true" onchange="renderRankings()" title="Free agent class year" style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1px;background:var(--card);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:5px 10px;outline:none;cursor:pointer;">
+        <option value="">All Classes</option>
+      </select>
+      <select id="rk_filter_fa_type" data-vosafe="true" onchange="renderRankings()" title="Free agency situation" style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1px;background:var(--card);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:5px 10px;outline:none;cursor:pointer;">
+        <option value="">Any Situation</option>
+        <option value="mlfa">ML Free Agents</option>
+        <option value="milbfa">Minor League Free Agents</option>
+        <option value="rule5">Rule 5</option>
+        <option value="nontender">Non-Tenders</option>
+      </select>
+      <select id="rk_filter_fa_level" data-vosafe="true" onchange="renderRankings()" title="MLB or minor leagues" style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1px;background:var(--card);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:5px 10px;outline:none;cursor:pointer;">
+        <option value="">MLB + Minors</option>
+        <option value="mlb">MLB only</option>
+        <option value="milb">Minor Leagues only</option>
+      </select>
+      <select id="rk_filter_fa_grade" data-vosafe="true" onchange="renderRankings()" title="Cut the list by grade" style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1px;background:var(--card);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:5px 10px;outline:none;cursor:pointer;">
+        <option value="">Any Grade</option>
+        <option value="40">40+</option>
+        <option value="45">45+</option>
+        <option value="50">50+</option>
+        <option value="55">55+</option>
+        <option value="60">60+</option>
+      </select>
+      <select id="rk_avail_sort" data-vosafe="true" onchange="renderRankings()" title="How to order the Available list" style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1px;background:var(--card);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:5px 10px;outline:none;cursor:pointer;">
+        <option value="rank">Sort: My Ranking</option>
+        <option value="class">Sort: Class Year</option>
+        <option value="situation">Sort: Situation</option>
+        <option value="org">Sort: Org</option>
+      </select>
+    </span>
 
     <div class="rankings-filter-sep"></div>
     <span id="rk_result_count" style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1px;color:var(--text3);margin-left:auto;flex-shrink:0;"></span>
@@ -4821,6 +4857,26 @@ function getPlayerCurrentOrg(p) {
   return candidates[0].org;
 }
 
+// ── FREE AGENCY TAG ──────────────────────────────────────────────────────────
+const FA_TYPES = [['mlfa','ML Free Agent'], ['milbfa','Minor League FA'], ['rule5','Rule 5'], ['nontender','Non-Tender']];
+function faTypeLabel(v) { const t = FA_TYPES.find(x => x[0] === v); return t ? t[1] : ''; }
+function getPlayerFaTag(p) {
+  const year = String(p.faYear || '').trim();
+  const type = String(p.faType || '').trim();
+  if (!year && !type) return null;
+  return { year, type, label: faTypeLabel(type) };
+}
+function faTagText(p) { const t = getPlayerFaTag(p); return t ? [t.year, t.label].filter(Boolean).join(' · ') : ''; }
+function faBadgeHtml(p) { const txt = faTagText(p); return txt ? `<span class="fa-badge" title="Free agency tag">${esc(txt)}</span>` : ''; }
+// Years offered in the Rankings filter: this year through 9 years out, always
+// (so e.g. 2026 is there before anyone is tagged), plus any year already in use.
+function faFilterYears() {
+  const base = new Date().getFullYear(), set = new Set();
+  for (let y = base; y <= base + 9; y++) set.add(String(y));
+  state.players.forEach(p => { const y = String(p.faYear || '').trim(); if (y) set.add(y); });
+  return [...set].sort();
+}
+
 function calcAge(birthdate) {
   if (!birthdate) return null;
   const today = new Date();
@@ -5819,6 +5875,7 @@ function renderDetail() {
     _positions.length && `<span class="bio-pill accent">${esc(_positions.join(', '))}</span>`,
     p.level    && `<span class="bio-pill level">${esc(p.level)}</span>`,
     _currentOrg && `<span class="bio-pill">${esc(_currentOrg)}</span>`,
+    faTagText(p) && `<span class="bio-pill fa" title="Free agency tag">FA · ${esc(faTagText(p))}</span>`,
     p.bats && p.throws && `<span class="bio-pill">B/T: ${esc(p.bats)}/${esc(p.throws)}</span>`,
     p.birthdate && calcAge(p.birthdate) !== null && `<span class="bio-pill">Age ${calcAge(p.birthdate).toFixed(1)}</span>`,
   ].filter(Boolean).join('');
@@ -6215,7 +6272,7 @@ function renderReports() {
   allPlayers = allPlayers.filter(p => {
     const reports = p.reports || [];
     const currentOrg = getPlayerCurrentOrg(p);
-    const allText = p.name.toLowerCase() + ' ' + currentOrg.toLowerCase() +
+    const allText = p.name.toLowerCase() + ' ' + currentOrg.toLowerCase() + ' ' + faTagText(p).toLowerCase() +
       ' ' + reports.map(r => (r.text||'') + ' ' + (r.location||'')).join(' ').toLowerCase();
     if (fPos    && p.position !== fPos)   return false;
     if (fOrg    && currentOrg !== fOrg)   return false;
@@ -6326,6 +6383,7 @@ function renderReports() {
             ${_gradeBoxes}
             <div class="org-player-impact">${_impact ? esc(_impact) : '<span style="color:var(--text4);">No impact statement yet</span>'}</div>
             <div class="org-player-tags-right">
+              ${faBadgeHtml(p)}
               ${p.position ? `<span class="org-player-pos">${esc(p.position)}</span>` : ''}
               ${displayLevel ? `<span class="org-player-level" title="${reportLevel ? 'Level report was written at' : 'Level follow was written at'}">${esc(displayLevel)}</span>` : ''}
               ${isProspect ? `<span style="font-family:'IBM Plex Mono',monospace;font-size:8px;letter-spacing:1px;text-transform:uppercase;color:#47c88a;background:rgba(71,200,138,.1);border:1px solid rgba(71,200,138,.25);padding:1px 6px;border-radius:3px;flex-shrink:0;">PRO</span>` : ''}
@@ -7528,8 +7586,18 @@ function _attachDragHandlers(tbody) {
 }
 
 function setRankingsTab(tab) {
+  const prevTab = document.getElementById('rk_tab_mlb')?.classList.contains('active') ? 'mlb'
+                : document.getElementById('rk_tab_avail')?.classList.contains('active') ? 'available' : 'prospects';
   document.getElementById('rk_tab_mlb')?.classList.toggle('active', tab === 'mlb');
   document.getElementById('rk_tab_prospects')?.classList.toggle('active', tab === 'prospects');
+  document.getElementById('rk_tab_avail')?.classList.toggle('active', tab === 'available');
+  const faBox = document.getElementById('rkFaControls');
+  if (faBox) faBox.style.display = tab === 'available' ? 'contents' : 'none';
+  if (tab === 'available' && prevTab !== 'available') {
+    // The MLB tab defaults to Kansas City; don't carry that into the league-wide Available list.
+    const orgSelA = document.getElementById('rk_filter_org');
+    if (orgSelA) orgSelA.value = '';
+  }
   if (tab === 'mlb') {
     const orgSel = document.getElementById('rk_filter_org');
     if (orgSel && !orgSel.value) orgSel.value = 'Kansas City Royals';
@@ -7617,8 +7685,24 @@ function renderClubAveragesPanel() {
 function _renderRankingsInner(feed) {
   const filterInterest = document.getElementById('rk_filter_interest')?.value || '';
   const filterPos      = document.getElementById('rk_filter_pos')?.value || '';
-  const rankTab = document.getElementById('rk_tab_mlb')?.classList.contains('active') ? 'mlb' : 'prospects';
-  const isDragMode     = _rankSort === 'drag';
+  // Free agency tag filters. The year list always includes this year onward.
+  const faYearSel = document.getElementById('rk_filter_fa_year');
+  let filterFaYear = '';
+  if (faYearSel) {
+    const curYear = faYearSel.value;
+    faYearSel.innerHTML = '<option value="">All Classes</option>' +
+      faFilterYears().map(y => '<option value="' + esc(y) + '"' + (y === curYear ? ' selected' : '') + '>' + esc(y) + '</option>').join('');
+    filterFaYear = faYearSel.value;
+  }
+  const filterFaType = document.getElementById('rk_filter_fa_type')?.value || '';
+  const filterFaLevel = document.getElementById('rk_filter_fa_level')?.value || '';
+  const availSort = document.getElementById('rk_avail_sort')?.value || 'rank';
+  const filterFaGrade = document.getElementById('rk_filter_fa_grade')?.value || '';
+  const rankTab = document.getElementById('rk_tab_mlb')?.classList.contains('active') ? 'mlb'
+                : document.getElementById('rk_tab_avail')?.classList.contains('active') ? 'available' : 'prospects';
+  const isAvail = rankTab === 'available';
+  const groupedAvail = isAvail && availSort !== 'rank';
+  const isDragMode     = _rankSort === 'drag' && !groupedAvail;
 
   // Populate org filter dropdown dynamically
   const orgSel = document.getElementById('rk_filter_org');
@@ -7638,6 +7722,20 @@ function _renderRankingsInner(feed) {
     if (p.playerCategory === 'amateur') return false;
     if (['College','High School'].includes(p.level) && !getPlayerCurrentOrg(p)) return false;
     if (getPlayerFTP(p) <= 0) return false;
+    if (isAvail) {
+      // Available Players: anyone tagged with a free agent class / situation, across
+      // every level and club (the public site still only shows graded players).
+      const t = getPlayerFaTag(p);
+      if (!t) return false;
+      if (filterFaYear && t.year !== filterFaYear) return false;
+      if (filterFaType && t.type !== filterFaType) return false;
+      const isMlbLevel = (p.level || '').toUpperCase() === 'MLB';
+      if (filterFaLevel === 'mlb' && !isMlbLevel) return false;
+      if (filterFaLevel === 'milb' && isMlbLevel) return false;
+      const faGrade = getPlayerFTP(p);
+      if (filterFaGrade === 'none' && faGrade > 0) return false;
+      if (filterFaGrade && filterFaGrade !== 'none' && faGrade < parseInt(filterFaGrade, 10)) return false;
+    }
     if (filterInterest && getEffectiveInterest(p) !== filterInterest) return false;
     if (filterPos && p.position !== filterPos) return false;
     if (filterOrg && getPlayerCurrentOrg(p) !== filterOrg) return false;
@@ -7712,8 +7810,8 @@ function _renderRankingsInner(feed) {
 
   if (players.length === 0) {
     feed.innerHTML = `<div class="rankings-empty">
-      <div class="rankings-empty-hed">No ${rankTab === 'mlb' ? 'MLB Players' : 'Prospects'} Found</div>
-      <div class="rankings-empty-sub">${rankTab === 'mlb' ? 'Players show here once their level is set to MLB, or a report/follow is logged at the MLB level' : 'Players show here once they have a report or follow and their level isn\'t MLB'}</div>
+      <div class="rankings-empty-hed">${isAvail ? 'No Available Players Found' : 'No ' + (rankTab === 'mlb' ? 'MLB Players' : 'Prospects') + ' Found'}</div>
+      <div class="rankings-empty-sub">${isAvail ? 'No graded players match these filters. Players appear here once they are tagged with a free agent class or situation.' : rankTab === 'mlb' ? 'Players show here once their level is set to MLB, or a report/follow is logged at the MLB level' : 'Players show here once they have a report or follow and their level isn\'t MLB'}</div>
     </div>`;
     return;
   }
@@ -7749,7 +7847,7 @@ function _renderRankingsInner(feed) {
       <td>
         <div style="display:flex;align-items:center;gap:8px;">
           <div>
-            <div class="rank-name">${esc(p.name)}${prospectBadge}</div>
+            <div class="rank-name">${esc(p.name)}${prospectBadge}${faBadgeHtml(p)}</div>
             <div class="rank-name-sub">${esc(rowCurrentOrg) || ''}${rowCurrentOrg && p.level ? ' · ' : ''}${esc(p.level) || ''}</div>
           </div>
           <button class="rank-expand-btn" id="rankExpandBtn_${p.id}" onclick="event.stopPropagation();toggleRankExpand('${p.id}')" title="Show tool grades and impact statement">▾</button>
@@ -7796,7 +7894,44 @@ function _renderRankingsInner(feed) {
   // In drag mode: flat list. In other modes: show interest tiers
   const showTiers = !isDragMode && (_rankSort === 'smart' || _rankSort === 'interest');
   let rows = '';
-  if (showTiers) {
+  if (groupedAvail) {
+    // Available Players sorted by class / situation / org: grouped under headers,
+    // each group ordered by grade then grade level.
+    const yr = p => String(p.faYear || '').trim() || '9999';
+    const typeIdx = p => { const i = FA_TYPES.findIndex(x => x[0] === p.faType); return i === -1 ? 99 : i; };
+    const orgOf = p => getPlayerCurrentOrg(p) || '\uffff';
+    const byGrade = (a, b) => (getPlayerFTP(b) - getPlayerFTP(a))
+      || (interestScore(getEffectiveInterest(b)) - interestScore(getEffectiveInterest(a)))
+      || (a.name || '').localeCompare(b.name || '');
+    let keyOf, labelOf, cmp;
+    if (availSort === 'class') {
+      keyOf = yr; labelOf = p => p.faYear ? String(p.faYear).trim() + ' Class' : 'No Class Year';
+      cmp = (a, b) => yr(a).localeCompare(yr(b)) || typeIdx(a) - typeIdx(b) || byGrade(a, b);
+    } else if (availSort === 'situation') {
+      keyOf = typeIdx; labelOf = p => faTypeLabel(p.faType) || 'No Situation';
+      cmp = (a, b) => typeIdx(a) - typeIdx(b) || yr(a).localeCompare(yr(b)) || byGrade(a, b);
+    } else {
+      keyOf = orgOf; labelOf = p => getPlayerCurrentOrg(p) || 'No Org';
+      cmp = (a, b) => orgOf(a).localeCompare(orgOf(b)) || byGrade(a, b);
+    }
+    players.sort(cmp);
+    const groupRow = (label, count) => `<tr><td colspan="6" style="padding:0;">
+      <div class="rank-tier-header">
+        <div class="rank-tier-dot" style="background:#e6b432;"></div>
+        <span class="rank-tier-label" style="color:#e6b432;">${esc(label)}</span>
+        <div class="rank-tier-line"></div>
+        <span class="rank-tier-count">${count} player${count !== 1 ? 's' : ''}</span>
+      </div></td></tr>`;
+    let curKey = null, bucket = [];
+    const flushGroup = () => {
+      if (!bucket.length) return;
+      rows += groupRow(labelOf(bucket[0]), bucket.length);
+      bucket.forEach((p, i) => { rows += buildRow(p, i + 1); });
+      bucket = [];
+    };
+    players.forEach(p => { const k = String(keyOf(p)); if (curKey !== null && k !== curKey) flushGroup(); curKey = k; bucket.push(p); });
+    flushGroup();
+  } else if (showTiers) {
     const highPlayers = players.filter(p => getEffectiveInterest(p) === 'high');
     const stdPlayers  = players.filter(p => getEffectiveInterest(p) === 'standard');
     const lowPlayers  = players.filter(p => getEffectiveInterest(p) === 'low');
