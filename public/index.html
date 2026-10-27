@@ -1676,7 +1676,8 @@ input.vo-locked,textarea.vo-locked{cursor:default;}
 .rk-fa-row { display:flex; flex-wrap:wrap; align-items:center; gap:10px; width:100%; padding-top:12px; margin-top:2px; border-top:1px solid var(--border); }
 @media (max-width:800px) {
   .rk-section-row { gap:8px; }
-  .rk-section-btn { flex:1; padding:10px 8px 8px; font-size:22px; letter-spacing:2px; }
+  .rk-section-btn { flex:1 1 0; min-width:0; padding:10px 6px 8px; font-size:17px; letter-spacing:1.5px; line-height:1.05; white-space:normal; }
+  #rk_tab_avail { flex:1.8 1 0; }
 }
 
 .rankings-table { width:100%; border-collapse:collapse; table-layout:fixed; }
@@ -1827,6 +1828,7 @@ tr.rank-row.rk-drag-below td { box-shadow:inset 0 -2px 0 var(--accent); }
 .org-player-row-top { display:flex;align-items:center;gap:12px;width:100%; }
 .org-player-row-bottom { display:flex;align-items:center;gap:0;width:100%;padding-top:8px; }
 .org-player-impact { flex:1;min-width:0;padding-left:16px;font-family:'Libre Baskerville',serif;font-size:12px;font-style:italic;color:var(--text2);line-height:1.5; }
+.org-player-date { font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.5px;color:var(--text3);white-space:nowrap; }
 .org-player-tags-right { display:flex;align-items:center;gap:8px;flex-shrink:0;padding-left:20px; }
 .org-grades-ofp { display:flex;align-items:center;justify-content:center;padding-right:16px;flex-shrink:0; }
 .org-grades-tools { display:flex;align-items:center;gap:6px;flex-shrink:0; }
@@ -2091,6 +2093,12 @@ tr.rank-row.rk-drag-below td { box-shadow:inset 0 -2px 0 var(--accent); }
       </select>
     </div>
     <div class="rfilter-group">
+      <label class="rfilter-label">Report Year</label>
+      <select class="rfilter-select" id="rf_year" onchange="renderReports()">
+        <option value="">All Years</option>
+      </select>
+    </div>
+    <div class="rfilter-group">
       <label class="rfilter-label">Sort By</label>
       <select class="rfilter-select" id="rf_sort" onchange="renderReports()">
         <option value="org_az" selected>Org A–Z</option>
@@ -2226,7 +2234,7 @@ tr.rank-row.rk-drag-below td { box-shadow:inset 0 -2px 0 var(--accent); }
   <div class="rk-section-row">
     <button id="rk_tab_mlb" class="rk-section-btn" data-vosafe="true" onclick="setRankingsTab('mlb')">MLB</button>
     <button id="rk_tab_prospects" class="rk-section-btn active" data-vosafe="true" onclick="setRankingsTab('prospects')">Prospects</button>
-    <button id="rk_tab_avail" class="rk-section-btn" data-vosafe="true" onclick="setRankingsTab('available')" title="Players tagged as free agents / Rule 5 / non-tenders">Available</button>
+    <button id="rk_tab_avail" class="rk-section-btn" data-vosafe="true" onclick="setRankingsTab('available')" title="Players tagged as free agents / Rule 5 / non-tenders">Offseason Availability</button>
   </div>
 
   <!-- Controls -->
@@ -2258,7 +2266,7 @@ tr.rank-row.rk-drag-below td { box-shadow:inset 0 -2px 0 var(--accent); }
     <div class="rankings-filter-sep"></div>
     <span id="rk_result_count" style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1px;color:var(--text3);margin-left:auto;flex-shrink:0;"></span>
     <div id="rkFaControls" class="rk-fa-row" style="display:none;">
-      <span class="rankings-controls-label">Free Agency</span>
+      <span class="rankings-controls-label">Offseason Availability</span>
       <select id="rk_filter_fa_year" data-vosafe="true" onchange="renderRankings()" title="Free agent class year" style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1px;background:var(--card);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:5px 10px;outline:none;cursor:pointer;">
         <option value="">All Classes</option>
       </select>
@@ -4930,6 +4938,22 @@ function faFilterYears() {
   return [...set].sort();
 }
 
+// ── REPORT DATES ─────────────────────────────────────────────────────────────
+// A player's "report date" is that of their finished reports; a player with no report
+// yet falls back to their follows, so they still show up when sorting/filtering by date.
+function getPlayerReportDates(p) {
+  const rep = (p.reports || []).filter(r => !r.isDraft && r.date).map(r => r.date);
+  if (rep.length) return rep;
+  return (p.follows || []).filter(f => f.date).map(f => f.date);
+}
+function getPlayerLatestReportDate(p) {
+  const ds = getPlayerReportDates(p);
+  return ds.length ? ds.reduce((a, b) => (a > b ? a : b)) : '';
+}
+function getPlayerReportYears(p) {
+  return [...new Set(getPlayerReportDates(p).map(d => String(d).slice(0, 4)).filter(y => /^\d{4}$/.test(y)))];
+}
+
 function calcAge(birthdate) {
   if (!birthdate) return null;
   const today = new Date();
@@ -6095,7 +6119,7 @@ function switchTab(name) {
 // ── REPORTS FEED ──────────────────────────────────────────────────────────────
 
 function clearReportFilters() {
-  ['rf_search','rf_position','rf_org','rf_ptype','rf_bats','rf_prospect'].forEach(id => {
+  ['rf_search','rf_position','rf_org','rf_ptype','rf_bats','rf_prospect','rf_year'].forEach(id => {
     const el = document.getElementById(id); if(el) el.value = '';
   });
   document.querySelectorAll('.rf-level-cb').forEach(cb => { cb.checked = false; });
@@ -6307,8 +6331,20 @@ function renderReports() {
   const fProspect = document.getElementById('rf_prospect')?.value || '';
   const sortBy    = document.getElementById('rf_sort')?.value || 'org_az';
 
+  // Report-year dropdown: every year that has a report (or a follow, for players with no report yet).
+  // Starts on All Years, so everything is included until you pick one.
+  const yearEl = document.getElementById('rf_year');
+  if (yearEl) {
+    const curYear = yearEl.value;
+    const years = new Set();
+    state.players.forEach(p => getPlayerReportYears(p).forEach(y => years.add(y)));
+    yearEl.innerHTML = '<option value="">All Years</option>' +
+      [...years].sort().reverse().map(y => `<option value="${y}"${y === curYear ? ' selected' : ''}>${y}</option>`).join('');
+  }
+  const fYear = yearEl ? yearEl.value : '';
+
   // Update active state on filter selects
-  ['rf_position','rf_org','rf_ptype','rf_bats','rf_prospect'].forEach(id => {
+  ['rf_position','rf_org','rf_ptype','rf_bats','rf_prospect','rf_year'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.classList.toggle('active', el.value !== '');
   });
@@ -6336,6 +6372,7 @@ function renderReports() {
     if (fPtype  && !reports.some(r => r.playerType === fPtype)) return false;
     if (fProspect === 'yes' && !reports.some(r => r.writtenAsProspect)) return false;
     if (fProspect === 'no'  &&  reports.some(r => r.writtenAsProspect)) return false;
+    if (fYear && !getPlayerReportYears(p).includes(fYear)) return false;
     if (search  && !allText.includes(search)) return false;
     return true;
   });
@@ -6361,6 +6398,15 @@ function renderReports() {
     return [...players].sort((a, b) => {
       if (sortBy === 'player_az') return a.name.localeCompare(b.name);
       if (sortBy === 'player_za') return b.name.localeCompare(a.name);
+      if (sortBy === 'date_desc' || sortBy === 'date_asc') {
+        const da = getPlayerLatestReportDate(a), db = getPlayerLatestReportDate(b);
+        if (da !== db) {
+          if (!da) return 1;            // players with no date at all go last, either direction
+          if (!db) return -1;
+          return sortBy === 'date_desc' ? db.localeCompare(da) : da.localeCompare(db);
+        }
+        // same date: fall through to grade, then grade level
+      }
       const gradeDiff = getPlayerFTP(b) - getPlayerFTP(a);
       if (gradeDiff !== 0) return gradeDiff;
       return interestScore(getEffectiveInterest(b)) - interestScore(getEffectiveInterest(a));
@@ -6368,7 +6414,7 @@ function renderReports() {
   };
 
   // Determine which orgs to show: all 30 MLB orgs, plus any extras (Independent etc.)
-  const hasFilter = fOrg || fPos || fLevels.length || fBats || fPtype || fProspect || search;
+  const hasFilter = fOrg || fPos || fLevels.length || fBats || fPtype || fProspect || fYear || search;
   let orgsToShow = hasFilter
     ? [...new Set(allPlayers.map(p => getPlayerCurrentOrg(p) || 'Other'))].sort()
     : [...MLB_ORGS, ...Object.keys(byOrg).filter(o => !MLB_ORGS.includes(o) && o !== 'Other').sort()];
@@ -6425,6 +6471,10 @@ function renderReports() {
           .filter(f => f.followLevel)
           .sort((a, b) => (b.date||'').localeCompare(a.date||''))[0]?.followLevel || '';
         const displayLevel = reportLevel || followLevel;
+        const _latestRptDate = getPlayerLatestReportDate(p);
+        const _rptDateHtml = _latestRptDate
+          ? `<span class="org-player-date" title="${(p.reports || []).some(r => !r.isDraft) ? 'Most recent report' : 'Most recent follow (no report yet)'}">${esc(fmtDate(_latestRptDate))}</span>`
+          : '';
 
         const _gradeBoxes = _buildOrgGradeBoxes(p, ofp, ofpColor);
         const _impact = getReportOrFollowImpact(p);
@@ -6438,6 +6488,7 @@ function renderReports() {
             ${_gradeBoxes}
             <div class="org-player-impact">${_impact ? esc(_impact) : '<span style="color:var(--text4);">No impact statement yet</span>'}</div>
             <div class="org-player-tags-right">
+              ${_rptDateHtml}
               ${faBadgeHtml(p)}
               ${p.position ? `<span class="org-player-pos">${esc(p.position)}</span>` : ''}
               ${displayLevel ? `<span class="org-player-level" title="${reportLevel ? 'Level report was written at' : 'Level follow was written at'}">${esc(displayLevel)}</span>` : ''}
@@ -7892,7 +7943,7 @@ function _renderRankingsInner(feed) {
 
   if (players.length === 0) {
     feed.innerHTML = `<div class="rankings-empty">
-      <div class="rankings-empty-hed">${isAvail ? 'No Available Players Found' : 'No ' + (rankTab === 'mlb' ? 'MLB Players' : 'Prospects') + ' Found'}</div>
+      <div class="rankings-empty-hed">${isAvail ? 'No Offseason Players Found' : 'No ' + (rankTab === 'mlb' ? 'MLB Players' : 'Prospects') + ' Found'}</div>
       <div class="rankings-empty-sub">${isAvail ? 'No graded players match these filters. Players appear here once they are tagged with a free agent class or situation.' : rankTab === 'mlb' ? 'Players show here once their level is set to MLB, or a report/follow is logged at the MLB level' : 'Players show here once they have a report or follow and their level isn\'t MLB'}</div>
     </div>`;
     return;
@@ -7917,7 +7968,7 @@ function _renderRankingsInner(feed) {
     const dragHandle = isDragMode
       ? `<td class="rank-drag-handle" onclick="event.stopPropagation()" title="Drag to reorder">⠿</td>`
       : '';
-    const colspan = isDragMode ? 7 : 6;
+    const colspan = isDragMode ? 8 : 7;   // every column in the table
     const gradeSource = getGradeSource(p);
     const gradeSourceColor = gradeSource === 'Report' ? '#47c88a' : gradeSource === 'Follow' ? '#5ba4cf' : 'var(--text4)';
     const ofpColor = gradeColorHex(ftp);
@@ -7997,7 +8048,7 @@ function _renderRankingsInner(feed) {
       cmp = (a, b) => orgOf(a).localeCompare(orgOf(b)) || byGrade(a, b);
     }
     players.sort(cmp);
-    const groupRow = (label, count) => `<tr><td colspan="6" style="padding:0;">
+    const groupRow = (label, count) => `<tr><td colspan="7" style="padding:0;">
       <div class="rank-tier-header">
         <div class="rank-tier-dot" style="background:#e6b432;"></div>
         <span class="rank-tier-label" style="color:#e6b432;">${esc(label)}</span>
@@ -8018,7 +8069,7 @@ function _renderRankingsInner(feed) {
     const stdPlayers  = players.filter(p => getEffectiveInterest(p) === 'standard');
     const lowPlayers  = players.filter(p => getEffectiveInterest(p) === 'low');
     let rankCursor = 1;
-    const tierRow = (color, label, count) => `<tr><td colspan="${isDragMode ? 7 : 6}" style="padding:0;">
+    const tierRow = (color, label, count) => `<tr><td colspan="${isDragMode ? 8 : 7}" style="padding:0;">
       <div class="rank-tier-header">
         <div class="rank-tier-dot" style="background:${color};"></div>
         <span class="rank-tier-label" style="color:${color};">${label}</span>
